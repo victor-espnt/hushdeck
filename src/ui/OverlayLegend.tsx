@@ -1,6 +1,7 @@
 const ENTRIES = [
   { className: 'overlay-block', label: 'Text block' },
   { className: 'overlay-email', label: 'Email' },
+  { className: 'overlay-phone', label: 'Phone' },
   { className: 'overlay-amount', label: 'Amount' },
   { className: 'overlay-percent', label: 'Percentage' },
 ]

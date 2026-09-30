@@ -1,3 +1,5 @@
+import { findNumbers } from 'libphonenumber-js'
+
 export type DetectionType = 'email' | 'phone' | 'amount' | 'percent'
 
 // A match in a page string: [start, end) offsets and the matched value.
@@ -61,9 +63,24 @@ export function detectPercents(text: string): RuleMatch[] {
   return matchAll(text, PERCENT, 'percent')
 }
 
+// International numbers (+44 20 7946 0958, 0033 1 42 68 53 00) and French
+// national ones (06 39 98 12 34, 01.42.68.53.00).
+export function detectPhones(text: string): RuleMatch[] {
+  const flat = flattenLines(text)
+  return findNumbers(flat, { defaultCountry: 'FR', v2: true }).map((m) => ({
+    type: 'phone',
+    value: flat.slice(m.startsAt, m.endsAt),
+    start: m.startsAt,
+    end: m.endsAt,
+  }))
+}
+
 // Every rule match in a page string, sorted by position.
 export function detectRules(text: string): RuleMatch[] {
-  return [...detectEmails(text), ...detectAmounts(text), ...detectPercents(text)].sort(
-    (a, b) => a.start - b.start || b.end - a.end,
-  )
+  return [
+    ...detectEmails(text),
+    ...detectPhones(text),
+    ...detectAmounts(text),
+    ...detectPercents(text),
+  ].sort((a, b) => a.start - b.start || b.end - a.end)
 }

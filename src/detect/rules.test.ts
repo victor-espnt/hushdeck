@@ -4,6 +4,7 @@ import {
   detectAmounts,
   detectEmails,
   detectPercents,
+  detectPhones,
   detectRules,
   type RuleMatch,
 } from './rules.ts'
@@ -88,6 +89,41 @@ describe('detectPercents', () => {
   })
 })
 
+describe('detectPhones', () => {
+  it('finds a French mobile in international format', () => {
+    expect(values(detectPhones(page(1)))).toEqual(['+33 6 39 98 12 34'])
+  })
+
+  it('finds a number split across two lines', () => {
+    const matches = detectPhones(page(9))
+    expect(values(matches)).toEqual(['+1 415 555 0142', '+44 20 7946 0958'])
+    // Offsets span the line break in the page string.
+    const split = matches[1]
+    expect(page(9).slice(split.start, split.end)).toBe('+44\n20 7946 0958')
+  })
+
+  it('reads French national formats', () => {
+    expect(values(detectPhones('Appelez le 06 39 98 12 34 ou le 01.42.68.53.00.'))).toEqual([
+      '06 39 98 12 34',
+      '01.42.68.53.00',
+    ])
+  })
+
+  it('reads other international formats', () => {
+    expect(values(detectPhones('Call 0033 1 42 68 53 00, +49 30 901820 or +32 2 555 12 12.'))).toEqual([
+      '0033 1 42 68 53 00',
+      '+49 30 901820',
+      '+32 2 555 12 12',
+    ])
+  })
+
+  it('ignores chart axes, dates, postcodes and page numbers', () => {
+    for (const n of [2, 3, 4, 5, 6, 7, 8]) {
+      expect(detectPhones(page(n))).toEqual([])
+    }
+  })
+})
+
 describe('detectRules', () => {
   it('reads a value split across two lines', () => {
     const [match] = detectRules('raised €2\nmillion')
@@ -96,7 +132,8 @@ describe('detectRules', () => {
 
   it('returns every type sorted by position', () => {
     const matches = detectRules(page(1))
-    expect(matches.map((m) => m.type)).toEqual(['amount', 'email'])
+    expect(matches.map((m) => m.type)).toEqual(['amount', 'email', 'phone'])
     expect(matches[0].start).toBeLessThan(matches[1].start)
+    expect(matches[1].start).toBeLessThan(matches[2].start)
   })
 })
