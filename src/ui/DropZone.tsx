@@ -2,10 +2,11 @@ import { useRef, useState, type DragEvent } from 'react'
 
 type Props = {
   onFile: (file: File) => void
+  onSample: () => void
   disabled?: boolean
 }
 
-export default function DropZone({ onFile, disabled }: Props) {
+export default function DropZone({ onFile, onSample, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -33,6 +34,9 @@ export default function DropZone({ onFile, disabled }: Props) {
         onClick={() => inputRef.current?.click()}
       >
         Choose a file
+      </button>
+      <button type="button" className="dropzone__sample" disabled={disabled} onClick={onSample}>
+        Try with a sample deck
       </button>
       <input
         ref={inputRef}

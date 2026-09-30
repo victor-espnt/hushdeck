@@ -45,6 +45,10 @@ body {
   text-align: center;
 }
 
+.dropzone__sample {
+  margin-left: 8px;
+}
+
 .dropzone--active {
   border-color: var(--accent);
 }

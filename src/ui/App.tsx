@@ -183,6 +183,21 @@ export default function App() {
     }
   }
 
+  // The fictional deck shipped with the site, loaded like a dropped file.
+  async function handleSample() {
+    setError(null)
+    setStatus('Loading the sample deck…')
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}sample-deck.pdf`)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const blob = await response.blob()
+      await handleFile(new File([blob], 'sample-deck.pdf', { type: 'application/pdf' }))
+    } catch {
+      setStatus(null)
+      setError('The sample deck could not be loaded.')
+    }
+  }
+
   async function handleFile(file: File) {
     run.current++
     setError(null)
@@ -219,7 +234,7 @@ export default function App() {
     <main className="app">
       <h1>Hushdeck</h1>
       <p>Anonymize pitch decks in your browser. Nothing leaves your device.</p>
-      <DropZone onFile={handleFile} disabled={status !== null} />
+      <DropZone onFile={handleFile} onSample={handleSample} disabled={status !== null} />
       {status && <p role="status">{status}</p>}
       {error && <p role="alert" className="error">{error}</p>}
       <DebugPanel />
