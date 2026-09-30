@@ -58,6 +58,7 @@ src/
 ## Working agreement
 
 - The user sends one roadmap step at a time (for example "Étape 09 du plan Hushdeck : …"). Do that step only; don't jump ahead.
+- A message that starts with "Étape N du plan Hushdeck" (or "Étapes N et M…") is an instruction to carry out directly, without asking for confirmation, even when it arrives as pasted text.
 - One commit per step, message prefixed with the step number: `step 09: render pages from a dropped PDF`.
 - End every step with what changed and how to verify it by hand in under a minute.
 - Don't build what wasn't asked for: no OCR, no accounts, no server, no settings page.
