@@ -12,7 +12,8 @@ import type { NerHandlers } from '../detect/nerClient.ts'
 import { buildReview } from '../detect/review.ts'
 import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
 import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
-import type { PageText } from '../pdf/textIndex.ts'
+import type { PageText, Rect } from '../pdf/textIndex.ts'
+import type { ManualArea } from '../render/manualArea.ts'
 import DebugPanel from './DebugPanel.tsx'
 import DropZone from './DropZone.tsx'
 import NerProgress, { type NerState } from './NerProgress.tsx'
@@ -34,6 +35,9 @@ export default function App() {
   const [unmasked, setUnmasked] = useState<ReadonlySet<string>>(new Set())
   // Terms the user added with "Mask this term too".
   const [customTerms, setCustomTerms] = useState<string[]>([])
+  // Areas drawn by hand, always masked until removed.
+  const [manualAreas, setManualAreas] = useState<ManualArea[]>([])
+  const nextAreaId = useRef(1)
   // Ignores NER results that belong to a previous document.
   const run = useRef(0)
 
@@ -73,7 +77,22 @@ export default function App() {
     (key: string) => !review.rowsOf(key).every((row) => unmasked.has(row)),
     [review, unmasked],
   )
-  const masks = useMemo(() => pages.map((page) => maskedRects(page, isMasked)), [pages, isMasked])
+  const masks = useMemo(
+    () =>
+      pages.map((page, i) => [
+        ...maskedRects(page, isMasked),
+        ...manualAreas.filter((area) => area.page === i).map((area) => area.rect),
+      ]),
+    [pages, isMasked, manualAreas],
+  )
+
+  function drawArea(page: number, rect: Rect) {
+    setManualAreas((areas) => [...areas, { id: nextAreaId.current++, page, rect }])
+  }
+
+  function removeArea(id: number) {
+    setManualAreas((areas) => areas.filter((area) => area.id !== id))
+  }
   const labels = useMemo(
     () => new Map(review.groups.flatMap((group) => group.rows.map((row) => [row.key, row.value]))),
     [review],
@@ -171,6 +190,7 @@ export default function App() {
     setNer({ phase: 'idle' })
     setUnmasked(new Set())
     setCustomTerms([])
+    setManualAreas([])
     setStatus('Opening the PDF…')
     let doc: PDFDocumentProxy
     try {
@@ -231,6 +251,8 @@ export default function App() {
                 isMasked={isMasked}
                 labelOf={(key) => review.rowsOf(key).map((row) => labels.get(row) ?? row).join(', ')}
                 onToggle={toggle}
+                manualAreas={manualAreas.filter((area) => area.page === i)}
+                onDrawArea={(rect) => drawArea(i, rect)}
                 showOverlay={showOverlay}
               />
             ))}
@@ -240,6 +262,8 @@ export default function App() {
             unmasked={unmasked}
             onChange={setMasked}
             onAddTerm={addTerm}
+            manualAreas={manualAreas}
+            onRemoveArea={removeArea}
           />
         </div>
       )}

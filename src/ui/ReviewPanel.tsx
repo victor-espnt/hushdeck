@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ReviewGroup } from '../detect/review.ts'
+import type { ManualArea } from '../render/manualArea.ts'
 
 type Props = {
   groups: ReviewGroup[]
@@ -8,18 +9,31 @@ type Props = {
   onChange: (keys: string[], masked: boolean) => void
   // Masks a term everywhere; returns a message when it cannot.
   onAddTerm: (term: string) => string | null
+  manualAreas: ManualArea[]
+  onRemoveArea: (id: number) => void
 }
 
 // Checked means masked. Everything starts checked (fail closed).
-export default function ReviewPanel({ groups, unmasked, onChange, onAddTerm }: Props) {
+export default function ReviewPanel({
+  groups,
+  unmasked,
+  onChange,
+  onAddTerm,
+  manualAreas,
+  onRemoveArea,
+}: Props) {
   return (
     <aside className="review" aria-label="Review what gets masked">
       <h2>Masked in the export</h2>
       <CustomTermForm onAddTerm={onAddTerm} />
+      <p className="review__hint">Drag on a page to mask an area by hand.</p>
       {groups.length === 0 && <p className="review__empty">Nothing detected yet.</p>}
       {groups.map((group) => (
         <ReviewGroupList key={group.type} group={group} unmasked={unmasked} onChange={onChange} />
       ))}
+      {manualAreas.length > 0 && (
+        <ManualAreaList manualAreas={manualAreas} onRemoveArea={onRemoveArea} />
+      )}
     </aside>
   )
 }
@@ -55,6 +69,34 @@ function CustomTermForm({ onAddTerm }: Pick<Props, 'onAddTerm'>) {
       </div>
       {message && <p className="review__add-message">{message}</p>}
     </form>
+  )
+}
+
+// Always masked; removing an area is how to unmask it.
+function ManualAreaList({ manualAreas, onRemoveArea }: Pick<Props, 'manualAreas' | 'onRemoveArea'>) {
+  return (
+    <section className="review__group">
+      <div className="review__group-label">
+        Manual areas <span className="review__count">{manualAreas.length}</span>
+      </div>
+      <ul>
+        {[...manualAreas]
+          .sort((a, b) => a.page - b.page || a.id - b.id)
+          .map((area) => (
+            <li key={area.id} className="review__area">
+              <span className="review__value">Page {area.page + 1}</span>
+              <button
+                type="button"
+                className="review__remove"
+                onClick={() => onRemoveArea(area.id)}
+                aria-label={`Remove the area on page ${area.page + 1}`}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+      </ul>
+    </section>
   )
 }
 

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import type { PageAnalysis } from '../detect/analyzePage.ts'
 import type { Rect } from '../pdf/textIndex.ts'
 import { isRenderCancelled, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import { blockRect, rangeToRects } from '../pdf/textIndex.ts'
+import { rectFromCorners, type ManualArea } from '../render/manualArea.ts'
 import { renderPage } from '../render/renderPage.ts'
 
 type Props = {
@@ -16,6 +17,9 @@ type Props = {
   labelOf: (key: string) => string
   // Masks or unmasks a value everywhere in the deck.
   onToggle: (key: string) => void
+  // Areas drawn by hand on this page; they are part of `masks`.
+  manualAreas: ManualArea[]
+  onDrawArea: (rect: Rect) => void
   showOverlay: boolean
 }
 
@@ -27,6 +31,8 @@ export default function PageView({
   isMasked,
   labelOf,
   onToggle,
+  manualAreas,
+  onDrawArea,
   showOverlay,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -74,6 +80,12 @@ export default function PageView({
     <figure className="page">
       <div className="page__sheet">
         <canvas ref={canvasRef} aria-label={`Page ${pageNumber}`} />
+        <DrawLayer
+          width={analysis.pageText.width}
+          height={analysis.pageText.height}
+          manualAreas={manualAreas}
+          onDrawArea={onDrawArea}
+        />
         <ZoneLayer analysis={analysis} isMasked={isMasked} labelOf={labelOf} onToggle={onToggle} />
         {showOverlay && <DebugOverlay analysis={analysis} />}
       </div>
@@ -81,6 +93,71 @@ export default function PageView({
         {failed ? `Page ${pageNumber} could not be rendered.` : `Page ${pageNumber}`}
       </figcaption>
     </figure>
+  )
+}
+
+// Dragging on the page, outside a detected zone, draws a manual area.
+function DrawLayer({
+  width,
+  height,
+  manualAreas,
+  onDrawArea,
+}: { width: number; height: number } & Pick<Props, 'manualAreas' | 'onDrawArea'>) {
+  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+
+  // Pointer position in page units.
+  function toPage(event: PointerEvent<SVGSVGElement>) {
+    const box = event.currentTarget.getBoundingClientRect()
+    return {
+      x: ((event.clientX - box.left) / box.width) * width,
+      y: ((event.clientY - box.top) / box.height) * height,
+    }
+  }
+
+  const preview = drag && rectFromCorners(drag.x0, drag.y0, drag.x1, drag.y1, width, height)
+
+  return (
+    <svg
+      className="page__overlay draw-layer"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return
+        event.currentTarget.setPointerCapture(event.pointerId)
+        const { x, y } = toPage(event)
+        setDrag({ x0: x, y0: y, x1: x, y1: y })
+      }}
+      onPointerMove={(event) => {
+        if (!drag) return
+        const { x, y } = toPage(event)
+        setDrag({ ...drag, x1: x, y1: y })
+      }}
+      onPointerUp={() => {
+        if (preview) onDrawArea(preview)
+        setDrag(null)
+      }}
+      onPointerCancel={() => setDrag(null)}
+    >
+      {manualAreas.map((area) => (
+        <rect
+          key={area.id}
+          className="manual-area"
+          x={area.rect.x}
+          y={area.rect.y}
+          width={area.rect.width}
+          height={area.rect.height}
+        />
+      ))}
+      {preview && (
+        <rect
+          className="manual-area manual-area--drawing"
+          x={preview.x}
+          y={preview.y}
+          width={preview.width}
+          height={preview.height}
+        />
+      )}
+    </svg>
   )
 }
 

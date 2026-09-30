@@ -311,3 +311,37 @@ body {
   margin: 4px 0 0;
   color: var(--danger);
 }
+
+.draw-layer {
+  pointer-events: all;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.manual-area {
+  fill: none;
+  stroke: rgb(37 99 235);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.manual-area--drawing {
+  fill: rgb(0 0 0 / 0.4);
+  stroke-dasharray: 4 3;
+}
+
+.review__hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.review__area {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.review__remove {
+  margin-left: auto;
+  font-size: 12px;
+}
