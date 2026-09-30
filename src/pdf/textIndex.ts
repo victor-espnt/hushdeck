@@ -137,17 +137,50 @@ export function blockAt(page: PageText, offset: number): TextBlock | undefined {
   return undefined
 }
 
+// Helvetica advance widths (per 1000 em) for ASCII 32 to 126, from the
+// standard font metrics. Only the ratios between characters matter here.
+// prettier-ignore
+const ASCII_WIDTHS = [
+  278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
+  556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,
+  1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778,
+  667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556,
+  333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556,
+  556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584,
+]
+const NARROW = new Set(['·', '•', '’', '‘', '\u00a0', '\u202f'])
+
+function charWidth(char: string): number {
+  const code = char.charCodeAt(0)
+  if (code >= 32 && code <= 126) return ASCII_WIDTHS[code - 32]
+  if (NARROW.has(char)) return 278
+  // Accented letters and other symbols: the width of a typical letter.
+  return 556
+}
+
+// Position of character `index` along a block, as a fraction of its width.
+function advanceFraction(str: string, index: number): number {
+  let before = 0
+  let total = 0
+  for (let i = 0; i < str.length; i++) {
+    const width = charWidth(str[i])
+    if (i < index) before += width
+    total += width
+  }
+  return total === 0 ? 0 : before / total
+}
+
 // Characters [from, to) of a block. A partial range gets a horizontal extent
-// proportional to its character offsets.
+// proportional to its characters' typical widths: PDF text items give no
+// per-glyph positions.
 export function blockRect(
   page: PageText,
   block: TextBlock,
   from = 0,
   to = block.str.length,
 ): Rect {
-  const length = block.str.length
-  const t0 = (block.advance * from) / length
-  const t1 = (block.advance * to) / length
+  const t0 = block.advance * advanceFraction(block.str, from)
+  const t1 = block.advance * advanceFraction(block.str, to)
   const s0 = -DESCENT * block.fontHeight
   const s1 = ASCENT * block.fontHeight
 
@@ -184,6 +217,27 @@ export function rangeToRects(page: PageText, start: number, end: number): Rect[]
     rects.push(blockRect(page, block, from, to))
   }
   return rects
+}
+
+// Margin around every mask, in page units: 2 units are 4 pixels at render
+// scale 2. It absorbs the error of the proportional estimate and antialiasing.
+export const MASK_PADDING = 2
+
+// The areas to mask for the page string range [start, end): one padded
+// rectangle per block, kept inside the page.
+export function maskRects(
+  page: PageText,
+  start: number,
+  end: number,
+  padding = MASK_PADDING,
+): Rect[] {
+  return rangeToRects(page, start, end).map((rect) => {
+    const left = Math.max(0, rect.x - padding)
+    const top = Math.max(0, rect.y - padding)
+    const right = Math.min(page.width, rect.x + rect.width + padding)
+    const bottom = Math.min(page.height, rect.y + rect.height + padding)
+    return { x: left, y: top, width: right - left, height: bottom - top }
+  })
 }
 
 function applyTransform(m: number[], x: number, y: number): [number, number] {

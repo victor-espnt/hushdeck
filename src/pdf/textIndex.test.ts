@@ -3,6 +3,8 @@ import {
   blockAt,
   blockRect,
   buildPageText,
+  maskRects,
+  MASK_PADDING,
   rangeToRects,
   type RawTextItem,
 } from './textIndex.ts'
@@ -95,13 +97,23 @@ describe('blockRect', () => {
 describe('rangeToRects', () => {
   const page = buildPageText(items, viewport)
 
-  it('estimates a partial range in proportion to its character offsets', () => {
+  it('estimates a partial range in proportion to typical character widths', () => {
+    // Helvetica: "i" is 222/1000 em wide, "M" 833/1000.
+    const narrowWide = buildPageText([item('iiiiMMMM', 10, 100, 200, 422)], viewport)
+    const [narrow] = rangeToRects(narrowWide, 0, 4)
+    const [wide] = rangeToRects(narrowWide, 4, 8)
+    expect(narrow.x).toBeCloseTo(100)
+    expect(narrow.width).toBeCloseTo((422 * 222) / (222 + 833))
+    expect(wide.x).toBeCloseTo(narrow.x + narrow.width)
+    expect(wide.width).toBeCloseTo((422 * 833) / (222 + 833))
+  })
+
+  it('places a mid-block range inside its block', () => {
     const email = 'claire.dubois@nimbalo.io'
     const start = page.text.indexOf(email)
     const [rect] = rangeToRects(page, start, start + email.length)
-    const perChar = 354 / contact.length
-    expect(rect.x).toBeCloseTo(43 + contact.indexOf(email) * perChar)
-    expect(rect.width).toBeCloseTo(email.length * perChar)
+    expect(rect.x).toBeGreaterThan(43)
+    expect(rect.x + rect.width).toBeLessThan(43 + 354)
   })
 
   it('returns one rectangle per block a range spans', () => {
@@ -114,5 +126,34 @@ describe('rangeToRects', () => {
 
   it('returns nothing for an empty range', () => {
     expect(rangeToRects(page, 5, 5)).toEqual([])
+  })
+})
+
+describe('maskRects', () => {
+  const page = buildPageText(items, viewport)
+
+  it('pads the proportional estimate on every side', () => {
+    const email = 'claire.dubois@nimbalo.io'
+    const start = page.text.indexOf(email)
+    const [estimate] = rangeToRects(page, start, start + email.length)
+    const [mask] = maskRects(page, start, start + email.length)
+    expect(mask.x).toBeCloseTo(estimate.x - MASK_PADDING)
+    expect(mask.y).toBeCloseTo(estimate.y - MASK_PADDING)
+    expect(mask.width).toBeCloseTo(estimate.width + 2 * MASK_PADDING)
+    expect(mask.height).toBeCloseTo(estimate.height + 2 * MASK_PADDING)
+  })
+
+  it('pads each line of a range that spans two blocks', () => {
+    const start = page.text.indexOf('seconds')
+    const end = page.text.indexOf('hours') + 'hours'.length
+    expect(maskRects(page, start, end)).toHaveLength(2)
+  })
+
+  it('keeps the padded area inside the page', () => {
+    const corner = buildPageText([item('Top', 10, 0, HEIGHT - 9, 20)], viewport)
+    const [mask] = maskRects(corner, 0, 3, 5)
+    expect(mask.x).toBe(0)
+    expect(mask.y).toBe(0)
+    expect(mask.width).toBeCloseTo(25)
   })
 })
