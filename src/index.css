@@ -2,6 +2,9 @@
   --text: #1f1d24;
   --muted: #6b6375;
   --bg: #fff;
+  --border: #d4d2d9;
+  --accent: #5b4bdb;
+  --danger: #c0262d;
 
   font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
@@ -14,6 +17,9 @@
     --text: #f3f4f6;
     --muted: #9ca3af;
     --bg: #16171d;
+    --border: #3a3c47;
+    --accent: #9d91ff;
+    --danger: #ff7a7f;
   }
 }
 
@@ -27,6 +33,50 @@ body {
   padding: 48px 16px;
 }
 
-.app p {
+.app > p {
+  color: var(--muted);
+}
+
+.dropzone {
+  margin: 24px 0;
+  padding: 32px 16px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.dropzone--active {
+  border-color: var(--accent);
+}
+
+.dropzone p {
+  margin: 0 0 12px;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.pages {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page {
+  margin: 0;
+}
+
+.page canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.page figcaption {
+  margin-top: 4px;
+  font-size: 14px;
   color: var(--muted);
 }
