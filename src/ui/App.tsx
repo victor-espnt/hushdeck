@@ -7,6 +7,7 @@ export default function App() {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showBlocks, setShowBlocks] = useState(false)
 
   // A file dropped outside the drop zone must not make the browser open it.
   useEffect(() => {
@@ -48,8 +49,16 @@ export default function App() {
       {error && <p role="alert" className="error">{error}</p>}
       {doc && (
         <section className="pages">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={showBlocks}
+              onChange={(event) => setShowBlocks(event.target.checked)}
+            />
+            Show text blocks
+          </label>
           {Array.from({ length: doc.numPages }, (_, i) => (
-            <PageView key={i + 1} doc={doc} pageNumber={i + 1} />
+            <PageView key={i + 1} doc={doc} pageNumber={i + 1} showBlocks={showBlocks} />
           ))}
         </section>
       )}
