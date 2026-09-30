@@ -42,3 +42,18 @@ export function nerDetections(pageTexts: string[], entitiesPerPage: NerEntity[][
     ),
   )
 }
+
+// Rule and NER detections of one page, sorted by position. Exact duplicates
+// and detections inside a longer one (a name inside an email) are dropped;
+// partial overlaps are kept, so their masks cover both.
+export function mergeDetections(...lists: Detection[][]): Detection[] {
+  const sorted = lists.flat().sort((a, b) => a.start - b.start || b.end - a.end)
+  const merged: Detection[] = []
+  let reach = -1
+  for (const detection of sorted) {
+    if (detection.end <= reach) continue
+    merged.push(detection)
+    reach = detection.end
+  }
+  return merged
+}

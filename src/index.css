@@ -183,3 +183,19 @@ body {
 .debug button {
   margin-top: 8px;
 }
+
+.ner-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.ner-progress progress {
+  width: 100%;
+  max-width: 480px;
+}
+
+.ner-progress__note {
+  color: var(--muted);
+}

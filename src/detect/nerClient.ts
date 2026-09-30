@@ -1,19 +1,36 @@
 import type { NerEntity } from './ner.ts'
-import type { AnalyzeResponse, NerRequest } from './ner.worker.ts'
+import type { NerRequest, NerResponse } from './ner.worker.ts'
+
+export type NerHandlers = {
+  onDownload: (loaded: number, total: number) => void
+  onPage: (pageIndex: number, entities: NerEntity[]) => void
+}
 
 let worker: Worker | undefined
+let busy = false
 
-// Runs the NER model off the main thread. The worker, and the model it
-// loads, are kept for the next document.
-export function detectEntities(pages: string[]): Promise<NerEntity[][]> {
+// Runs the NER model off the main thread and reports each page as it is
+// done. The worker keeps the model for the next document; a run still in
+// progress when a new one starts is stopped with its worker.
+export function detectEntities(pages: string[], handlers: NerHandlers): Promise<void> {
+  if (busy) {
+    worker?.terminate()
+    worker = undefined
+  }
   worker ??= new Worker(new URL('./ner.worker.ts', import.meta.url), { type: 'module' })
   const current = worker
-  return new Promise((resolve, reject) => {
-    current.onmessage = (event: MessageEvent<AnalyzeResponse>) => {
-      if (event.data.type === 'entities') resolve(event.data.entities)
-      else reject(new Error(event.data.message))
+  busy = true
+  return new Promise<void>((resolve, reject) => {
+    current.onmessage = (event: MessageEvent<NerResponse>) => {
+      const message = event.data
+      if (message.type === 'download') handlers.onDownload(message.loaded, message.total)
+      else if (message.type === 'page') handlers.onPage(message.pageIndex, message.entities)
+      else if (message.type === 'done') resolve()
+      else reject(new Error(message.message))
     }
     current.onerror = (event) => reject(new Error(event.message))
     current.postMessage({ type: 'analyze', pages } satisfies NerRequest)
+  }).finally(() => {
+    if (worker === current) busy = false
   })
 }

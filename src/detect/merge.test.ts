@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_DECK_PAGES } from './fixtures/sampleDeck.ts'
 import { SAMPLE_DECK_NER } from './fixtures/sampleDeckNer.ts'
-import { findOccurrences, nerDetections } from './merge.ts'
+import { findOccurrences, mergeDetections, nerDetections, type Detection } from './merge.ts'
 import { aggregateEntities } from './ner.ts'
 
 describe('findOccurrences', () => {
@@ -55,5 +55,31 @@ describe('nerDetections on the sample deck', () => {
   it('keeps each value with the type the model gave it first', () => {
     const nimbalo = detections.flat().filter((d) => d.value === 'Nimbalo')
     expect(new Set(nimbalo.map((d) => d.type)).size).toBe(1)
+  })
+})
+
+describe('mergeDetections', () => {
+  const d = (type: Detection['type'], start: number, end: number): Detection => ({
+    type,
+    value: '',
+    start,
+    end,
+  })
+
+  it('drops a detection inside a longer one', () => {
+    // "nimbalo" (NER) inside "invest@nimbalo.io" (rule).
+    expect(mergeDetections([d('email', 20, 37)], [d('organization', 27, 34)])).toEqual([d('email', 20, 37)])
+  })
+
+  it('drops exact duplicates', () => {
+    expect(mergeDetections([d('person', 0, 13)], [d('person', 0, 13)])).toEqual([d('person', 0, 13)])
+  })
+
+  it('keeps partial overlaps and sorts by position', () => {
+    expect(mergeDetections([d('person', 10, 20)], [d('organization', 15, 30), d('amount', 0, 3)])).toEqual([
+      d('amount', 0, 3),
+      d('person', 10, 20),
+      d('organization', 15, 30),
+    ])
   })
 })

@@ -1,6 +1,6 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { extractPageText, maskRects, type PageText, type Rect } from '../pdf/textIndex.ts'
-import type { Detection } from './merge.ts'
+import { mergeDetections, type Detection } from './merge.ts'
 import { detectRules } from './rules.ts'
 
 export type PageAnalysis = {
@@ -12,9 +12,7 @@ export type PageAnalysis = {
 
 // Rule detections, plus any found elsewhere (the NER model) for this page.
 export function analyzePage(pageText: PageText, extra: Detection[] = []): PageAnalysis {
-  const detections = [...detectRules(pageText.text), ...extra].sort(
-    (a, b) => a.start - b.start || b.end - a.end,
-  )
+  const detections = mergeDetections(detectRules(pageText.text), extra)
   const masks = detections.flatMap((match) => maskRects(pageText, match.start, match.end))
   return { pageText, detections, masks }
 }

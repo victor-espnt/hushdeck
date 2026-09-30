@@ -15,27 +15,43 @@ export default function PageView({ doc, pageNumber, analysis, showOverlay }: Pro
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [failed, setFailed] = useState(false)
 
+  // Redraw only when this page's masks change, not on every NER update.
+  const masksKey = JSON.stringify(analysis.masks)
+
   useEffect(() => {
     let cancelled = false
     let cancelRender: (() => void) | undefined
+    // Drawn off screen, then copied in one step: the page never shows
+    // without its masks, even for a frame.
+    const offscreen = document.createElement('canvas')
 
     doc
       .getPage(pageNumber)
       .then((page) => {
-        if (cancelled || !canvasRef.current) return
-        const job = renderPage(page, canvasRef.current, analysis.masks)
+        if (cancelled) return
+        const job = renderPage(page, offscreen, JSON.parse(masksKey))
         cancelRender = job.cancel
-        return job.promise
+        return job.promise.then(() => {
+          const canvas = canvasRef.current
+          if (cancelled || !canvas) return
+          canvas.width = offscreen.width
+          canvas.height = offscreen.height
+          canvas.getContext('2d')?.drawImage(offscreen, 0, 0)
+        })
       })
       .catch((err: unknown) => {
         if (!cancelled && !isRenderCancelled(err)) setFailed(true)
+      })
+      .finally(() => {
+        offscreen.width = 0
+        offscreen.height = 0
       })
 
     return () => {
       cancelled = true
       cancelRender?.()
     }
-  }, [doc, pageNumber, analysis])
+  }, [doc, pageNumber, masksKey])
 
   return (
     <figure className="page">
