@@ -2,15 +2,25 @@
 
 Anonymize a pitch deck in your browser. Nothing leaves your device.
 
-**Try it:** https://victor-espnt.github.io/hushdeck/
+<!-- TODO: record demo GIF -->
+![Demo](docs/demo.gif)
 
-<!-- Demo GIF goes here: docs/demo.gif -->
+**Try it:** https://victor-espnt.github.io/hushdeck/
 
 ## The problem
 
-Founders share decks to get feedback, and investors pass them to peers for a second opinion. The decks carry names, emails, phone numbers, revenue and valuation. Masking them by hand is slow and error-prone. Black boxes drawn in a PDF editor often leave the text underneath, and anyone can copy it back out.
+The most common case today: you paste a deck into an AI assistant, such as ChatGPT or Claude, to get a summary or an investment memo. The names, numbers and contacts in it go to a third party.
+
+It is not new. Founders share decks to get feedback, and investors pass them to peers for a second opinion. The decks carry names, emails, phone numbers, revenue and valuation. Masking them by hand is slow and error-prone. Black boxes drawn in a PDF editor often leave the text underneath, and anyone can copy it back out.
 
 Hushdeck finds the sensitive items, lets you review them, and exports a new PDF where they are gone.
+
+Use it before you paste a deck into an AI assistant or forward it to anyone.
+
+<!-- Victor: rewrite in your own words -->
+## Why I built this
+
+I spent ten years building dealflow and portfolio management software used by more than 200 VC funds. I saw decks forwarded, forwarded again, and now pasted into AI assistants. Masking them properly took too long, so nobody did it.
 
 ## Why local
 
@@ -56,11 +66,11 @@ flowchart LR
 
 - **Rasterized export.** Removing text from a PDF is fragile. Text can hide in annotations, form fields, metadata, fonts or incremental updates. Hushdeck rebuilds the document from page images instead. The export has no text layer, no annotations and no original metadata. It cannot leak what it does not contain. The trade-off: the text is no longer selectable, and the file is larger.
 - **Fail closed.** Everything detected is masked by default, and you unmask what you want to keep. A value masked by mistake costs a black box. A value left visible by mistake is a leak. The score threshold for names is low for the same reason.
+- **The CSP covers the workers too.** GitHub Pages cannot send headers, so the Content-Security-Policy is a meta tag. A meta policy does not reach workers loaded from their own URL. Hushdeck starts its workers (pdf.js, the NER model) from blob URLs, so they inherit the page's policy. `connect-src` allows this site, `huggingface.co` and `*.hf.co`, nothing else.
 - **Zones are estimated, then widened, never trimmed.** PDF text items have no per-character positions. A name inside a longer line gets a horizontal range estimated from typical character widths. The box is then padded by 0.3 em along the text and 2 points across it. A box may cover a letter too many. It should never leave a letter out.
 - **An English model under MIT.** `Xenova/bert-base-NER` is English-only and misses names that a better multilingual model would catch. Stronger multilingual models exist, but under non-commercial licenses. Hushdeck keeps a license that lets anyone use and fork it, and relies on the review step to catch what the model misses.
 - **One row per entity.** "Claire", "Dubois" and "Claire Dubois" are one person. The panel shows one row, and its checkbox acts on every variant. Unmasking a name unmasks all its forms, and masking it masks them all.
 - **Export waits for the NER.** The rules run at once, and names arrive page by page. The export button stays disabled until the model has read every page, so you cannot export a deck with half of its names found.
-- **The CSP covers the workers too.** GitHub Pages cannot send headers, so the Content-Security-Policy is a meta tag. A meta policy does not reach workers loaded from their own URL. Hushdeck starts its workers (pdf.js, the NER model) from blob URLs, so they inherit the page's policy. `connect-src` allows this site, `huggingface.co` and `*.hf.co`, nothing else.
 - **Reproducible export, neutral file name.** The export has no dates, no document ID and no metadata except a neutral Producer and Creator. The same deck with the same choices gives the same file, byte for byte, in the same browser. The file is always named `anonymized-deck.pdf`, never after the original.
 
 ## Known limitations
@@ -72,7 +82,7 @@ flowchart LR
 - **US numbers need their country code.** Phone detection defaults to France. `(415) 555-0142` is not found, while `+1 415 555 0142` is.
 - **About 124 MB on first use.** That is the model (109 MB) and the ONNX runtime (14 MB). Later visits load them from the browser cache.
 - **Files over 50 MB are refused.** Every page is rendered at scale 2 in memory.
-- **Anonymizing is not de-identifying.** Masking names and numbers does not hide the market, the product, the chart shapes or the writing style. Someone who knows the space may still recognize the company. Decide what else to mask with that in mind.
+- **Anonymizing is not de-identifying.** Masking names and numbers does not hide the market, the product, the chart shapes or the writing style. Someone who knows the space may still recognize the company. An ex-CTO of a health-tech unicorn raising €3M for an HR SaaS in Lyon is recognizable without a single name. Decide what else to mask with that in mind.
 
 ## Sample deck
 
@@ -113,4 +123,15 @@ The dev server does not apply the Content-Security-Policy, because Vite needs in
 
 ## How this was built
 
-Hushdeck was built over two evenings with [Claude Code](https://claude.com/claude-code). [CLAUDE.md](CLAUDE.md) served as the specification: goals, non-negotiables, stack and known pitfalls. The work followed a numbered plan, one step at a time, with one commit per step. `git log` shows them in order.
+Hushdeck was built over two evenings with [Claude Code](https://claude.com/claude-code). I wrote the specification ([CLAUDE.md](CLAUDE.md)) and the step-by-step plan, made the product decisions, and checked every step by hand. Claude Code wrote the code. The work followed the plan one step at a time, with one commit per step: 26 commits and 90 unit tests at the time of writing.
+
+Checking by hand changed the product more than once. Two examples:
+
+- The review panel listed "Claire" and "Claire Dubois" on two separate rows, so unchecking the full name left the first name masked elsewhere. The panel now groups the variants of an entity into one row.
+- The logo of the sample deck survived the export: it is an image, and there is no text to detect in it. Manual areas moved into scope.
+
+## What's next
+
+- Local OCR, for example Tesseract.js in a worker, to find text inside images.
+- A multilingual NER model, as soon as one is available under a permissive license.
+- Automatic logo detection, to pre-fill the manual areas.
