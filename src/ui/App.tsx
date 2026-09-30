@@ -70,6 +70,10 @@ export default function App() {
     })
   }
 
+  function toggle(key: string) {
+    setMasked([key], unmasked.has(key))
+  }
+
   const nerRunning = ner.phase === 'download' || ner.phase === 'analyze'
 
   function runNer(pageTexts: PageText[]) {
@@ -185,6 +189,7 @@ export default function App() {
                 analysis={analysis}
                 masks={masks[i]}
                 unmasked={unmasked}
+                onToggle={toggle}
                 showOverlay={showOverlay}
               />
             ))}

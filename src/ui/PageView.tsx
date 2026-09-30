@@ -13,10 +13,20 @@ type Props = {
   masks: Rect[]
   // Keys of the values the user unmasked: outlined in the preview only.
   unmasked: ReadonlySet<string>
+  // Masks or unmasks a value everywhere in the deck.
+  onToggle: (key: string) => void
   showOverlay: boolean
 }
 
-export default function PageView({ doc, pageNumber, analysis, masks, unmasked, showOverlay }: Props) {
+export default function PageView({
+  doc,
+  pageNumber,
+  analysis,
+  masks,
+  unmasked,
+  onToggle,
+  showOverlay,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [failed, setFailed] = useState(false)
 
@@ -62,7 +72,7 @@ export default function PageView({ doc, pageNumber, analysis, masks, unmasked, s
     <figure className="page">
       <div className="page__sheet">
         <canvas ref={canvasRef} aria-label={`Page ${pageNumber}`} />
-        <UnmaskedOutlines analysis={analysis} unmasked={unmasked} />
+        <ZoneLayer analysis={analysis} unmasked={unmasked} onToggle={onToggle} />
         {showOverlay && <DebugOverlay analysis={analysis} />}
       </div>
       <figcaption>
@@ -72,24 +82,41 @@ export default function PageView({ doc, pageNumber, analysis, masks, unmasked, s
   )
 }
 
-// Unmasked zones keep a dotted outline, so the user sees what they chose
-// to reveal. Drawn above the canvas: never part of the export.
-function UnmaskedOutlines({ analysis, unmasked }: { analysis: PageAnalysis; unmasked: ReadonlySet<string> }) {
-  const zones = analysis.zones.filter((zone) => unmasked.has(zone.key))
-  if (zones.length === 0) return null
+// One click target per zone, above the canvas: clicking masks or unmasks
+// the zone's value everywhere. Unmasked zones keep a dotted outline, so the
+// user sees what they chose to reveal. Never part of the export.
+function ZoneLayer({
+  analysis,
+  unmasked,
+  onToggle,
+}: {
+  analysis: PageAnalysis
+  unmasked: ReadonlySet<string>
+  onToggle: (key: string) => void
+}) {
   const { width, height } = analysis.pageText
+  // Larger zones first, so a zone inside another stays clickable on top.
+  const zones = [...analysis.zones].sort(
+    (a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height,
+  )
   return (
-    <svg className="page__overlay" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
-      {zones.map((zone, i) => (
-        <rect
-          key={i}
-          className="unmasked-zone"
-          x={zone.rect.x}
-          y={zone.rect.y}
-          width={zone.rect.width}
-          height={zone.rect.height}
-        />
-      ))}
+    <svg className="page__overlay zone-layer" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      {zones.map((zone, i) => {
+        const isUnmasked = unmasked.has(zone.key)
+        return (
+          <rect
+            key={i}
+            className={isUnmasked ? 'zone zone--unmasked' : 'zone'}
+            x={zone.rect.x}
+            y={zone.rect.y}
+            width={zone.rect.width}
+            height={zone.rect.height}
+            onClick={() => onToggle(zone.key)}
+          >
+            <title>{`${isUnmasked ? 'Mask' : 'Unmask'} "${zone.value}" everywhere`}</title>
+          </rect>
+        )
+      })}
     </svg>
   )
 }

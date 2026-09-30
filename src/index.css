@@ -267,8 +267,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.unmasked-zone {
-  fill: none;
+.zone-layer .zone {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.zone-layer .zone:hover {
+  stroke: rgb(220 38 38);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.zone-layer .zone--unmasked {
   stroke: rgb(220 38 38);
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
