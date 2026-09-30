@@ -87,11 +87,57 @@ body {
   pointer-events: none;
 }
 
-.page__overlay rect {
-  fill: rgb(255 0 128 / 0.12);
-  stroke: rgb(255 0 128 / 0.8);
-  stroke-width: 0.75;
+.page__overlay rect,
+.legend rect {
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
+}
+
+.overlay-block {
+  fill: none;
+  stroke: rgb(120 120 120 / 0.7);
+}
+
+.overlay-email {
+  --overlay: 37 99 235;
+}
+
+.overlay-phone {
+  --overlay: 22 163 74;
+}
+
+.overlay-amount {
+  --overlay: 234 88 12;
+}
+
+.overlay-percent {
+  --overlay: 147 51 234;
+}
+
+:is(.overlay-email, .overlay-phone, .overlay-amount, .overlay-percent) {
+  fill: rgb(var(--overlay) / 0.3);
+  stroke: rgb(var(--overlay));
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend svg {
+  width: 14px;
+  height: 14px;
 }
 
 .toggle {

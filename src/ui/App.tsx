@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import DropZone from './DropZone.tsx'
+import OverlayLegend from './OverlayLegend.tsx'
 import PageView from './PageView.tsx'
 
 export default function App() {
@@ -55,8 +56,9 @@ export default function App() {
               checked={showBlocks}
               onChange={(event) => setShowBlocks(event.target.checked)}
             />
-            Show text blocks
+            Show debug overlay
           </label>
+          {showBlocks && <OverlayLegend />}
           {Array.from({ length: doc.numPages }, (_, i) => (
             <PageView key={i + 1} doc={doc} pageNumber={i + 1} showBlocks={showBlocks} />
           ))}

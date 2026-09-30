@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   isRenderCancelled,
   renderPageToCanvas,
   type PDFDocumentProxy,
 } from '../pdf/loadPdf.ts'
-import { blockRect, extractPageText, type PageText } from '../pdf/textIndex.ts'
+import { detectRules } from '../detect/rules.ts'
+import {
+  blockRect,
+  extractPageText,
+  rangeToRects,
+  type PageText,
+} from '../pdf/textIndex.ts'
 
 type Props = {
   doc: PDFDocumentProxy
@@ -72,6 +78,8 @@ export default function PageView({ doc, pageNumber, showBlocks }: Props) {
 }
 
 function BlockOverlay({ pageText }: { pageText: PageText }) {
+  const detections = useMemo(() => detectRules(pageText.text), [pageText])
+
   return (
     <svg
       className="page__overlay"
@@ -86,6 +94,7 @@ function BlockOverlay({ pageText }: { pageText: PageText }) {
           return (
             <rect
               key={block.start}
+              className="overlay-block"
               x={rect.x}
               y={rect.y}
               width={rect.width}
@@ -93,6 +102,18 @@ function BlockOverlay({ pageText }: { pageText: PageText }) {
             />
           )
         })}
+      {detections.flatMap((match) =>
+        rangeToRects(pageText, match.start, match.end).map((rect, i) => (
+          <rect
+            key={`${match.type}-${match.start}-${i}`}
+            className={`overlay-${match.type}`}
+            x={rect.x}
+            y={rect.y}
+            width={rect.width}
+            height={rect.height}
+          />
+        )),
+      )}
     </svg>
   )
 }
