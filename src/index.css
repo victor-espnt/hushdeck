@@ -286,3 +286,28 @@ body {
   stroke-dasharray: 4 3;
   vector-effect: non-scaling-stroke;
 }
+
+.review__add {
+  margin-bottom: 16px;
+}
+
+.review__add label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.review__add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.review__add-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.review__add-message {
+  margin: 4px 0 0;
+  color: var(--danger);
+}

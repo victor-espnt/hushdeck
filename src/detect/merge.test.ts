@@ -5,6 +5,7 @@ import {
   findOccurrences,
   mergeDetections,
   nerDetections,
+  termDetections,
   valueKey,
   type Detection,
 } from './merge.ts'
@@ -97,5 +98,21 @@ describe('mergeDetections', () => {
 describe('valueKey', () => {
   it('ignores case and whitespace differences', () => {
     expect(valueKey(' Castellane\nTransports ')).toBe(valueKey('castellane transports'))
+  })
+})
+
+describe('termDetections', () => {
+  it('finds a custom term on every page, ignoring case, on word limits', () => {
+    // The model never flags the "MO" initials on page 7.
+    const found = termDetections(SAMPLE_DECK_PAGES, ['mo'])
+    expect(found.map((page) => page.length)).toEqual([0, 0, 0, 0, 0, 0, 1, 0, 0])
+    const [mo] = found[6]
+    expect(mo).toMatchObject({ type: 'custom', value: 'mo' })
+    expect(SAMPLE_DECK_PAGES[6].slice(mo.start, mo.end)).toBe('MO')
+  })
+
+  it('does not match inside a longer word', () => {
+    // "Castellane" appears on page 5 only as a whole word; "Castel" never.
+    expect(termDetections(SAMPLE_DECK_PAGES, ['Castel']).flat()).toEqual([])
   })
 })

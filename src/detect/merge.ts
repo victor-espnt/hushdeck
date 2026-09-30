@@ -65,3 +65,12 @@ export function mergeDetections(...lists: Detection[][]): Detection[] {
     )
   })
 }
+
+// Terms the user asked to mask, found on every page like a NER value.
+export function termDetections(pageTexts: string[], terms: string[]): Detection[][] {
+  return pageTexts.map((text) =>
+    terms.flatMap((term) =>
+      findOccurrences(text, term).map(({ start, end }) => ({ type: 'custom' as const, value: term, start, end })),
+    ),
+  )
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ReviewGroup } from '../detect/review.ts'
 
 type Props = {
@@ -6,13 +6,16 @@ type Props = {
   // Keys of the values the user chose to leave visible.
   unmasked: ReadonlySet<string>
   onChange: (keys: string[], masked: boolean) => void
+  // Masks a term everywhere; returns a message when it cannot.
+  onAddTerm: (term: string) => string | null
 }
 
 // Checked means masked. Everything starts checked (fail closed).
-export default function ReviewPanel({ groups, unmasked, onChange }: Props) {
+export default function ReviewPanel({ groups, unmasked, onChange, onAddTerm }: Props) {
   return (
     <aside className="review" aria-label="Review what gets masked">
       <h2>Masked in the export</h2>
+      <CustomTermForm onAddTerm={onAddTerm} />
       {groups.length === 0 && <p className="review__empty">Nothing detected yet.</p>}
       {groups.map((group) => (
         <ReviewGroupList key={group.type} group={group} unmasked={unmasked} onChange={onChange} />
@@ -21,7 +24,45 @@ export default function ReviewPanel({ groups, unmasked, onChange }: Props) {
   )
 }
 
-function ReviewGroupList({ group, unmasked, onChange }: { group: ReviewGroup } & Omit<Props, 'groups'>) {
+// Searched on the whole deck, ignoring case, on word limits; the term goes
+// to the Custom group.
+function CustomTermForm({ onAddTerm }: Pick<Props, 'onAddTerm'>) {
+  const [term, setTerm] = useState('')
+  const [message, setMessage] = useState<string | null>(null)
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    const problem = onAddTerm(term)
+    setMessage(problem)
+    if (!problem) setTerm('')
+  }
+
+  return (
+    <form className="review__add" onSubmit={handleSubmit}>
+      <label htmlFor="custom-term">Mask this term too</label>
+      <div className="review__add-row">
+        <input
+          id="custom-term"
+          type="text"
+          value={term}
+          onChange={(event) => setTerm(event.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button type="submit" disabled={term.trim() === ''}>
+          Mask
+        </button>
+      </div>
+      {message && <p className="review__add-message">{message}</p>}
+    </form>
+  )
+}
+
+function ReviewGroupList({
+  group,
+  unmasked,
+  onChange,
+}: { group: ReviewGroup } & Pick<Props, 'unmasked' | 'onChange'>) {
   const keys = group.values.map((value) => value.key)
   const maskedCount = keys.filter((key) => !unmasked.has(key)).length
   const all = maskedCount === keys.length

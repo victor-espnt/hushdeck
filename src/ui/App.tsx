@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { analyzePage, extractDocumentText, maskedRects } from '../detect/analyzePage.ts'
-import { nerDetections } from '../detect/merge.ts'
+import { findOccurrences, nerDetections, termDetections, valueKey } from '../detect/merge.ts'
 import type { NerEntity } from '../detect/ner.ts'
 import { detectEntities } from '../detect/nerClient.ts'
 import { reviewGroups } from '../detect/review.ts'
@@ -26,6 +26,8 @@ export default function App() {
   const [showOverlay, setShowOverlay] = useState(false)
   // Values the user unchecked. Everything else is masked (fail closed).
   const [unmasked, setUnmasked] = useState<ReadonlySet<string>>(new Set())
+  // Terms the user added with "Mask this term too".
+  const [customTerms, setCustomTerms] = useState<string[]>([])
   // Ignores NER results that belong to a previous document.
   const run = useRef(0)
 
@@ -53,8 +55,9 @@ export default function App() {
     if (!deck) return []
     const texts = deck.pageTexts.map((page) => page.text)
     const found = nerDetections(texts, entities)
-    return deck.pageTexts.map((page, i) => analyzePage(page, found[i]))
-  }, [deck, entities])
+    const custom = termDetections(texts, customTerms)
+    return deck.pageTexts.map((page, i) => analyzePage(page, [...found[i], ...custom[i]]))
+  }, [deck, entities, customTerms])
 
   const groups = useMemo(() => reviewGroups(pages), [pages])
   const masks = useMemo(() => pages.map((page) => maskedRects(page, unmasked)), [pages, unmasked])
@@ -68,6 +71,21 @@ export default function App() {
       }
       return next
     })
+  }
+
+  // Returns a message when the term cannot be added.
+  function addTerm(input: string): string | null {
+    const term = input.replace(/\s+/g, ' ').trim()
+    if (!deck || term === '') return null
+    if (!deck.pageTexts.some((page) => findOccurrences(page.text, term).length > 0)) {
+      return `"${term}" does not appear in the text of this deck.`
+    }
+    if (!customTerms.some((existing) => valueKey(existing) === valueKey(term))) {
+      setCustomTerms([...customTerms, term])
+    }
+    // Adding a term the user had unmasked masks it again.
+    setMasked([valueKey(term)], true)
+    return null
   }
 
   function toggle(key: string) {
@@ -131,6 +149,7 @@ export default function App() {
     setDeck(null)
     setNer({ phase: 'idle' })
     setUnmasked(new Set())
+    setCustomTerms([])
     setStatus('Opening the PDF…')
     let doc: PDFDocumentProxy
     try {
@@ -194,7 +213,12 @@ export default function App() {
               />
             ))}
           </section>
-          <ReviewPanel groups={groups} unmasked={unmasked} onChange={setMasked} />
+          <ReviewPanel
+            groups={groups}
+            unmasked={unmasked}
+            onChange={setMasked}
+            onAddTerm={addTerm}
+          />
         </div>
       )}
     </main>
