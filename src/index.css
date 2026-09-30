@@ -158,3 +158,13 @@ body {
   font-size: 14px;
   color: var(--muted);
 }
+
+.debug {
+  margin-bottom: 24px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.debug button {
+  margin-top: 8px;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { runNerSmokeTest } from '../detect/nerSmokeTest.ts'
 import { analyzeDocument, type PageAnalysis } from '../detect/analyzePage.ts'
 import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
 import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
@@ -11,6 +12,7 @@ export default function App() {
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showOverlay, setShowOverlay] = useState(false)
+  const [nerSummary, setNerSummary] = useState<string | null>(null)
 
   // A file dropped outside the drop zone must not make the browser open it.
   useEffect(() => {
@@ -29,6 +31,23 @@ export default function App() {
       deck?.doc.loadingTask.destroy()
     }
   }, [deck])
+
+  async function handleNerSmokeTest() {
+    setError(null)
+    setStatus('Running the NER smoke test… (see the console)')
+    try {
+      const result = await runNerSmokeTest()
+      setStatus(null)
+      setNerSummary(
+        `NER smoke test: ${(result.downloadedBytes / 1e6).toFixed(1)} MB downloaded, ` +
+          `load ${Math.round(result.loadMs)} ms, inference ${Math.round(result.inferenceMs)} ms. ` +
+          `Details in the console.`,
+      )
+    } catch (err) {
+      setStatus(null)
+      setError(`NER smoke test failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
 
   async function handleExport() {
     if (!deck) return
@@ -76,6 +95,13 @@ export default function App() {
       <DropZone onFile={handleFile} disabled={status !== null} />
       {status && <p role="status">{status}</p>}
       {error && <p role="alert" className="error">{error}</p>}
+      <details className="debug">
+        <summary>Debug</summary>
+        <button type="button" onClick={handleNerSmokeTest} disabled={status !== null}>
+          Run NER smoke test
+        </button>
+        {nerSummary && <p>{nerSummary}</p>}
+      </details>
       {deck && (
         <section className="pages">
           <div className="toolbar">

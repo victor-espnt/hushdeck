@@ -173,16 +173,18 @@ function advanceFraction(str: string, index: number): number {
 // Characters [from, to) of a block. A partial range gets a horizontal extent
 // proportional to its characters' typical widths: PDF text items give no
 // per-glyph positions.
+// Padding is in page units, applied along and across the text direction.
 export function blockRect(
   page: PageText,
   block: TextBlock,
   from = 0,
   to = block.str.length,
+  padding = { along: 0, across: 0 },
 ): Rect {
-  const t0 = block.advance * advanceFraction(block.str, from)
-  const t1 = block.advance * advanceFraction(block.str, to)
-  const s0 = -DESCENT * block.fontHeight
-  const s1 = ASCENT * block.fontHeight
+  const t0 = block.advance * advanceFraction(block.str, from) - padding.along
+  const t1 = block.advance * advanceFraction(block.str, to) + padding.along
+  const s0 = -DESCENT * block.fontHeight - padding.across
+  const s1 = ASCENT * block.fontHeight + padding.across
 
   const xs: number[] = []
   const ys: number[] = []
@@ -205,39 +207,51 @@ export function blockRect(
   }
 }
 
-// One rectangle per block touched by the page string range [start, end).
-export function rangeToRects(page: PageText, start: number, end: number): Rect[] {
-  const rects: Rect[] = []
-  if (end <= start) return rects
-  for (const block of page.blocks) {
-    if (block.end <= start) continue
-    if (block.start >= end) break
-    const from = Math.max(start, block.start) - block.start
-    const to = Math.min(end, block.end) - block.start
-    rects.push(blockRect(page, block, from, to))
-  }
-  return rects
-}
-
-// Margin around every mask, in page units: 2 units are 4 pixels at render
-// scale 2. It absorbs the error of the proportional estimate and antialiasing.
-export const MASK_PADDING = 2
-
-// The areas to mask for the page string range [start, end): one padded
-// rectangle per block, kept inside the page.
-export function maskRects(
+// Calls `visit` with each block touched by the page string range
+// [start, end), and the part of the block it covers.
+function forEachBlockIn(
   page: PageText,
   start: number,
   end: number,
-  padding = MASK_PADDING,
-): Rect[] {
-  return rangeToRects(page, start, end).map((rect) => {
-    const left = Math.max(0, rect.x - padding)
-    const top = Math.max(0, rect.y - padding)
-    const right = Math.min(page.width, rect.x + rect.width + padding)
-    const bottom = Math.min(page.height, rect.y + rect.height + padding)
-    return { x: left, y: top, width: right - left, height: bottom - top }
+  visit: (block: TextBlock, from: number, to: number) => void,
+) {
+  if (end <= start) return
+  for (const block of page.blocks) {
+    if (block.end <= start) continue
+    if (block.start >= end) break
+    visit(block, Math.max(start, block.start) - block.start, Math.min(end, block.end) - block.start)
+  }
+}
+
+// One rectangle per block touched by the page string range [start, end).
+export function rangeToRects(page: PageText, start: number, end: number): Rect[] {
+  const rects: Rect[] = []
+  forEachBlockIn(page, start, end, (block, from, to) => rects.push(blockRect(page, block, from, to)))
+  return rects
+}
+
+// Margin around every mask. Along the text: a fraction of the block's font
+// size, which absorbs the error of the proportional estimate at any size.
+// Across the text: page units (2 units are 4 pixels at render scale 2).
+export const MASK_PADDING_EM = 0.3
+export const MASK_PADDING_ACROSS = 2
+
+// The areas to mask for the page string range [start, end): one padded
+// rectangle per block, kept inside the page.
+export function maskRects(page: PageText, start: number, end: number): Rect[] {
+  const rects: Rect[] = []
+  forEachBlockIn(page, start, end, (block, from, to) => {
+    const rect = blockRect(page, block, from, to, {
+      along: MASK_PADDING_EM * block.fontHeight,
+      across: MASK_PADDING_ACROSS,
+    })
+    const left = Math.max(0, rect.x)
+    const top = Math.max(0, rect.y)
+    const right = Math.min(page.width, rect.x + rect.width)
+    const bottom = Math.min(page.height, rect.y + rect.height)
+    rects.push({ x: left, y: top, width: right - left, height: bottom - top })
   })
+  return rects
 }
 
 function applyTransform(m: number[], x: number, y: number): [number, number] {

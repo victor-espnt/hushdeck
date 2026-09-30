@@ -3,8 +3,9 @@ import {
   blockAt,
   blockRect,
   buildPageText,
+  MASK_PADDING_ACROSS,
+  MASK_PADDING_EM,
   maskRects,
-  MASK_PADDING,
   rangeToRects,
   type RawTextItem,
 } from './textIndex.ts'
@@ -132,15 +133,28 @@ describe('rangeToRects', () => {
 describe('maskRects', () => {
   const page = buildPageText(items, viewport)
 
-  it('pads the proportional estimate on every side', () => {
+  it('pads 0.3 em of the block font along the text, 2 units across', () => {
     const email = 'claire.dubois@nimbalo.io'
     const start = page.text.indexOf(email)
     const [estimate] = rangeToRects(page, start, start + email.length)
     const [mask] = maskRects(page, start, start + email.length)
-    expect(mask.x).toBeCloseTo(estimate.x - MASK_PADDING)
-    expect(mask.y).toBeCloseTo(estimate.y - MASK_PADDING)
-    expect(mask.width).toBeCloseTo(estimate.width + 2 * MASK_PADDING)
-    expect(mask.height).toBeCloseTo(estimate.height + 2 * MASK_PADDING)
+    // The contact line is set in 13 pt.
+    const along = MASK_PADDING_EM * 13
+    expect(mask.x).toBeCloseTo(estimate.x - along)
+    expect(mask.width).toBeCloseTo(estimate.width + 2 * along)
+    expect(mask.y).toBeCloseTo(estimate.y - MASK_PADDING_ACROSS)
+    expect(mask.height).toBeCloseTo(estimate.height + 2 * MASK_PADDING_ACROSS)
+  })
+
+  it('scales the horizontal margin with the font size', () => {
+    const title = page.text.indexOf('seconds')
+    const contact = page.text.indexOf('CEO')
+    const [large] = maskRects(page, title, title + 3)
+    const [small] = maskRects(page, contact, contact + 3)
+    const [largeEstimate] = rangeToRects(page, title, title + 3)
+    const [smallEstimate] = rangeToRects(page, contact, contact + 3)
+    expect(large.width - largeEstimate.width).toBeCloseTo(2 * MASK_PADDING_EM * 40)
+    expect(small.width - smallEstimate.width).toBeCloseTo(2 * MASK_PADDING_EM * 13)
   })
 
   it('pads each line of a range that spans two blocks', () => {
@@ -151,9 +165,9 @@ describe('maskRects', () => {
 
   it('keeps the padded area inside the page', () => {
     const corner = buildPageText([item('Top', 10, 0, HEIGHT - 9, 20)], viewport)
-    const [mask] = maskRects(corner, 0, 3, 5)
+    const [mask] = maskRects(corner, 0, 3)
     expect(mask.x).toBe(0)
     expect(mask.y).toBe(0)
-    expect(mask.width).toBeCloseTo(25)
+    expect(mask.width).toBeCloseTo(20 + MASK_PADDING_EM * 10)
   })
 })
