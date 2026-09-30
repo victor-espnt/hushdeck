@@ -1,27 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  isRenderCancelled,
-  renderPageToCanvas,
-  type PDFDocumentProxy,
-} from '../pdf/loadPdf.ts'
-import { detectRules } from '../detect/rules.ts'
-import {
-  blockRect,
-  extractPageText,
-  rangeToRects,
-  type PageText,
-} from '../pdf/textIndex.ts'
+import { useEffect, useRef, useState } from 'react'
+import type { PageAnalysis } from '../detect/analyzePage.ts'
+import { isRenderCancelled, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
+import { blockRect, rangeToRects } from '../pdf/textIndex.ts'
+import { renderPage } from '../render/renderPage.ts'
 
 type Props = {
   doc: PDFDocumentProxy
   pageNumber: number
-  showBlocks: boolean
+  analysis: PageAnalysis
+  showOverlay: boolean
 }
 
-export default function PageView({ doc, pageNumber, showBlocks }: Props) {
+export default function PageView({ doc, pageNumber, analysis, showOverlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [failed, setFailed] = useState(false)
-  const [pageText, setPageText] = useState<PageText | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -31,9 +23,9 @@ export default function PageView({ doc, pageNumber, showBlocks }: Props) {
       .getPage(pageNumber)
       .then((page) => {
         if (cancelled || !canvasRef.current) return
-        const task = renderPageToCanvas(page, canvasRef.current)
-        cancelRender = () => task.cancel()
-        return task.promise
+        const job = renderPage(page, canvasRef.current, analysis.masks)
+        cancelRender = job.cancel
+        return job.promise
       })
       .catch((err: unknown) => {
         if (!cancelled && !isRenderCancelled(err)) setFailed(true)
@@ -43,32 +35,13 @@ export default function PageView({ doc, pageNumber, showBlocks }: Props) {
       cancelled = true
       cancelRender?.()
     }
-  }, [doc, pageNumber])
-
-  // Text is only extracted once the overlay is first shown.
-  const needsText = showBlocks && pageText === null
-  useEffect(() => {
-    if (!needsText) return
-    let cancelled = false
-    doc
-      .getPage(pageNumber)
-      .then(extractPageText)
-      .then((text) => {
-        if (!cancelled) setPageText(text)
-      })
-      .catch(() => {
-        // The overlay is a debug aid: a page without text blocks stays usable.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [doc, pageNumber, needsText])
+  }, [doc, pageNumber, analysis])
 
   return (
     <figure className="page">
       <div className="page__sheet">
         <canvas ref={canvasRef} aria-label={`Page ${pageNumber}`} />
-        {showBlocks && pageText && <BlockOverlay pageText={pageText} />}
+        {showOverlay && <DebugOverlay analysis={analysis} />}
       </div>
       <figcaption>
         {failed ? `Page ${pageNumber} could not be rendered.` : `Page ${pageNumber}`}
@@ -77,9 +50,9 @@ export default function PageView({ doc, pageNumber, showBlocks }: Props) {
   )
 }
 
-function BlockOverlay({ pageText }: { pageText: PageText }) {
-  const detections = useMemo(() => detectRules(pageText.text), [pageText])
-
+// Debug aid, drawn above the canvas: never part of the render or the export.
+function DebugOverlay({ analysis }: { analysis: PageAnalysis }) {
+  const { pageText, detections } = analysis
   return (
     <svg
       className="page__overlay"
