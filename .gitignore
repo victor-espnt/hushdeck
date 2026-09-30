@@ -1,0 +1,18 @@
+# Dependencies and build output
+node_modules
+dist
+*.local
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Editor and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Never commit a real pitch deck. The sample deck is fictional.
+*.pdf
+!public/sample-deck.pdf

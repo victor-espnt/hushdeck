@@ -1,0 +1,32 @@
+:root {
+  --text: #1f1d24;
+  --muted: #6b6375;
+  --bg: #fff;
+
+  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #f3f4f6;
+    --muted: #9ca3af;
+    --bg: #16171d;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.app p {
+  color: var(--muted);
+}
