@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { runNerSmokeTest } from '../detect/nerSmokeTest.ts'
-import { analyzeDocument, type PageAnalysis } from '../detect/analyzePage.ts'
+import { analyzePage, extractDocumentText, type PageAnalysis } from '../detect/analyzePage.ts'
+import { nerDetections } from '../detect/merge.ts'
+import { detectEntities } from '../detect/nerClient.ts'
 import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
 import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import DropZone from './DropZone.tsx'
@@ -79,7 +81,11 @@ export default function App() {
     // Pages are shown only once their masks are known.
     setStatus('Finding sensitive items…')
     try {
-      setDeck({ doc, pages: await analyzeDocument(doc) })
+      const pageTexts = await extractDocumentText(doc)
+      setStatus('Finding names and organizations…')
+      const texts = pageTexts.map((page) => page.text)
+      const entities = nerDetections(texts, await detectEntities(texts))
+      setDeck({ doc, pages: pageTexts.map((page, i) => analyzePage(page, entities[i])) })
     } catch {
       doc.loadingTask.destroy()
       setError('The text of this PDF could not be read.')

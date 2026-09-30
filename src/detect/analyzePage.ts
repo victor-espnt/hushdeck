@@ -1,26 +1,29 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { extractPageText, maskRects, type PageText, type Rect } from '../pdf/textIndex.ts'
-import { detectRules, type RuleMatch } from './rules.ts'
+import type { Detection } from './merge.ts'
+import { detectRules } from './rules.ts'
 
 export type PageAnalysis = {
   pageText: PageText
-  detections: RuleMatch[]
+  detections: Detection[]
   // Fail closed: every detection is masked.
   masks: Rect[]
 }
 
-export function analyzePage(pageText: PageText): PageAnalysis {
-  const detections = detectRules(pageText.text)
+// Rule detections, plus any found elsewhere (the NER model) for this page.
+export function analyzePage(pageText: PageText, extra: Detection[] = []): PageAnalysis {
+  const detections = [...detectRules(pageText.text), ...extra].sort(
+    (a, b) => a.start - b.start || b.end - a.end,
+  )
   const masks = detections.flatMap((match) => maskRects(pageText, match.start, match.end))
   return { pageText, detections, masks }
 }
 
-// One analysis per page, in page order.
-export async function analyzeDocument(doc: PDFDocumentProxy): Promise<PageAnalysis[]> {
-  const analyses: PageAnalysis[] = []
+// The text index of every page, in page order.
+export async function extractDocumentText(doc: PDFDocumentProxy): Promise<PageText[]> {
+  const pages: PageText[] = []
   for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
-    const page = await doc.getPage(pageNumber)
-    analyses.push(analyzePage(await extractPageText(page)))
+    pages.push(await extractPageText(await doc.getPage(pageNumber)))
   }
-  return analyses
+  return pages
 }

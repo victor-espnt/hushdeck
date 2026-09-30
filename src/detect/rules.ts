@@ -1,10 +1,10 @@
 import { findNumbers } from 'libphonenumber-js'
 
-export type DetectionType = 'email' | 'phone' | 'amount' | 'percent'
+export type RuleType = 'email' | 'phone' | 'amount' | 'percent'
 
 // A match in a page string: [start, end) offsets and the matched value.
 export type RuleMatch = {
-  type: DetectionType
+  type: RuleType
   value: string
   start: number
   end: number
@@ -41,7 +41,7 @@ export function flattenLines(text: string): string {
   return text.replace(/\n/g, ' ')
 }
 
-function matchAll(text: string, pattern: RegExp, type: DetectionType): RuleMatch[] {
+function matchAll(text: string, pattern: RegExp, type: RuleType): RuleMatch[] {
   const flat = flattenLines(text)
   return Array.from(flat.matchAll(pattern), (m) => ({
     type,

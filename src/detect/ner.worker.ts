@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
-import { env, pipeline } from '@huggingface/transformers'
+import { env, pipeline, type TokenClassificationPipeline } from '@huggingface/transformers'
+import { aggregateEntities, chunkText, type NerEntity, type NerToken } from './ner.ts'
 // Serve the ONNX Runtime files from this site instead of the jsDelivr default.
 import ortMjsUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url'
 import ortWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url'
@@ -24,9 +25,14 @@ export type SmokeTestResult = {
   output: unknown
 }
 
-export type SmokeTestRequest = { type: 'smoke-test'; text: string }
+export type NerRequest =
+  | { type: 'smoke-test'; text: string }
+  | { type: 'analyze'; pages: string[] }
 export type SmokeTestResponse =
   | { type: 'result'; result: SmokeTestResult }
+  | { type: 'error'; message: string }
+export type AnalyzeResponse =
+  | { type: 'entities'; entities: NerEntity[][] }
   | { type: 'error'; message: string }
 
 const onnxWasm = env.backends.onnx.wasm!
@@ -64,9 +70,34 @@ env.fetch = async (input: string | URL, init?: RequestInit) => {
   })
 }
 
+let nerPipeline: Promise<TokenClassificationPipeline> | undefined
+
+// Loaded once per worker, then reused for every document.
+function loadNer(): Promise<TokenClassificationPipeline> {
+  nerPipeline ??= pipeline('token-classification', NER_MODEL, { dtype: 'q8', device: 'wasm' })
+  return nerPipeline
+}
+
+// Entities of each page string, with offsets into that page string.
+async function analyze(pages: string[]): Promise<NerEntity[][]> {
+  const ner = await loadNer()
+  const results: NerEntity[][] = []
+  for (const page of pages) {
+    const entities: NerEntity[] = []
+    for (const chunk of chunkText(page)) {
+      const tokens = (await ner(chunk.text, { ignore_labels: [] })) as NerToken[]
+      for (const entity of aggregateEntities(chunk.text, tokens)) {
+        entities.push({ ...entity, start: entity.start + chunk.offset, end: entity.end + chunk.offset })
+      }
+    }
+    results.push(entities)
+  }
+  return results
+}
+
 async function smokeTest(text: string): Promise<SmokeTestResult> {
   const loadStart = performance.now()
-  const ner = await pipeline('token-classification', NER_MODEL, { dtype: 'q8', device: 'wasm' })
+  const ner = await loadNer()
   const loadMs = performance.now() - loadStart
 
   const inferenceStart = performance.now()
@@ -87,10 +118,16 @@ async function smokeTest(text: string): Promise<SmokeTestResult> {
   }
 }
 
-self.onmessage = async (event: MessageEvent<SmokeTestRequest>) => {
+self.onmessage = async (event: MessageEvent<NerRequest>) => {
+  const request = event.data
   try {
-    const result = await smokeTest(event.data.text)
-    self.postMessage({ type: 'result', result } satisfies SmokeTestResponse)
+    if (request.type === 'smoke-test') {
+      const result = await smokeTest(request.text)
+      self.postMessage({ type: 'result', result } satisfies SmokeTestResponse)
+    } else {
+      const entities = await analyze(request.pages)
+      self.postMessage({ type: 'entities', entities } satisfies AnalyzeResponse)
+    }
   } catch (err) {
     self.postMessage({ type: 'error', message: String(err) } satisfies SmokeTestResponse)
   }

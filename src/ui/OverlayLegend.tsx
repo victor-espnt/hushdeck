@@ -4,6 +4,8 @@ const ENTRIES = [
   { className: 'overlay-phone', label: 'Phone' },
   { className: 'overlay-amount', label: 'Amount' },
   { className: 'overlay-percent', label: 'Percentage' },
+  { className: 'overlay-person', label: 'Person' },
+  { className: 'overlay-organization', label: 'Organization' },
 ]
 
 export default function OverlayLegend() {

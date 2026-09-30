@@ -1,5 +1,5 @@
 import { SAMPLE_DECK_PAGES } from './fixtures/sampleDeck.ts'
-import type { SmokeTestResponse, SmokeTestResult } from './ner.worker.ts'
+import type { NerRequest, SmokeTestResponse, SmokeTestResult } from './ner.worker.ts'
 
 // Debug only: runs the NER model on page 7 of the fictional sample deck,
 // never on the user's document, and logs what it costs.
@@ -11,7 +11,7 @@ export function runNerSmokeTest(): Promise<SmokeTestResult> {
       else reject(new Error(event.data.message))
     }
     worker.onerror = (event) => reject(new Error(event.message))
-    worker.postMessage({ type: 'smoke-test', text: SAMPLE_DECK_PAGES[6] })
+    worker.postMessage({ type: 'smoke-test', text: SAMPLE_DECK_PAGES[6] } satisfies NerRequest)
   })
     .then((result) => {
       logResult(result)
