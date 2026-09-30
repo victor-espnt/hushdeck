@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { analyzeDocument, type PageAnalysis } from '../detect/analyzePage.ts'
+import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
 import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import DropZone from './DropZone.tsx'
 import OverlayLegend from './OverlayLegend.tsx'
@@ -28,6 +29,21 @@ export default function App() {
       deck?.doc.loadingTask.destroy()
     }
   }, [deck])
+
+  async function handleExport() {
+    if (!deck) return
+    setError(null)
+    try {
+      const bytes = await exportPdf(deck.doc, deck.pages, (pageNumber) =>
+        setStatus(`Exporting page ${pageNumber} of ${deck.pages.length}…`),
+      )
+      downloadPdf(bytes)
+    } catch {
+      setError('The export failed.')
+    } finally {
+      setStatus(null)
+    }
+  }
 
   async function handleFile(file: File) {
     setError(null)
@@ -62,14 +78,19 @@ export default function App() {
       {error && <p role="alert" className="error">{error}</p>}
       {deck && (
         <section className="pages">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={showOverlay}
-              onChange={(event) => setShowOverlay(event.target.checked)}
-            />
-            Show debug overlay
-          </label>
+          <div className="toolbar">
+            <button type="button" onClick={handleExport} disabled={status !== null}>
+              Export anonymized PDF
+            </button>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={showOverlay}
+                onChange={(event) => setShowOverlay(event.target.checked)}
+              />
+              Show debug overlay
+            </label>
+          </div>
           {showOverlay && <OverlayLegend />}
           {deck.pages.map((analysis, i) => (
             <PageView

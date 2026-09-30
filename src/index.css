@@ -140,6 +140,13 @@ body {
   height: 14px;
 }
 
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
 .toggle {
   display: flex;
   align-items: center;
