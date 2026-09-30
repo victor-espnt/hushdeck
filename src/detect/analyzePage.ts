@@ -1,20 +1,40 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { extractPageText, maskRects, type PageText, type Rect } from '../pdf/textIndex.ts'
-import { mergeDetections, type Detection } from './merge.ts'
+import { mergeDetections, valueKey, type Detection, type DetectionType } from './merge.ts'
 import { detectRules } from './rules.ts'
+
+// One area to mask, tied to the value it hides.
+export type Zone = {
+  key: string
+  value: string
+  type: DetectionType
+  rect: Rect
+}
 
 export type PageAnalysis = {
   pageText: PageText
   detections: Detection[]
-  // Fail closed: every detection is masked.
-  masks: Rect[]
+  zones: Zone[]
 }
 
-// Rule detections, plus any found elsewhere (the NER model) for this page.
+// Rule detections, plus any found elsewhere (the NER model, the user's own
+// terms) for this page.
 export function analyzePage(pageText: PageText, extra: Detection[] = []): PageAnalysis {
   const detections = mergeDetections(detectRules(pageText.text), extra)
-  const masks = detections.flatMap((match) => maskRects(pageText, match.start, match.end))
-  return { pageText, detections, masks }
+  const zones = detections.flatMap((detection) =>
+    maskRects(pageText, detection.start, detection.end).map((rect) => ({
+      key: valueKey(detection.value),
+      value: detection.value,
+      type: detection.type,
+      rect,
+    })),
+  )
+  return { pageText, detections, zones }
+}
+
+// Fail closed: a zone is masked unless the user unmasked its value.
+export function maskedRects(page: PageAnalysis, unmasked: ReadonlySet<string>): Rect[] {
+  return page.zones.filter((zone) => !unmasked.has(zone.key)).map((zone) => zone.rect)
 }
 
 // The text index of every page, in page order.

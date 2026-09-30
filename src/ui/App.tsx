@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { analyzePage, extractDocumentText } from '../detect/analyzePage.ts'
+import { analyzePage, extractDocumentText, maskedRects } from '../detect/analyzePage.ts'
 import { nerDetections } from '../detect/merge.ts'
 import type { NerEntity } from '../detect/ner.ts'
 import { detectEntities } from '../detect/nerClient.ts'
+import { reviewGroups } from '../detect/review.ts'
 import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
 import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import type { PageText } from '../pdf/textIndex.ts'
@@ -11,6 +12,7 @@ import DropZone from './DropZone.tsx'
 import NerProgress, { type NerState } from './NerProgress.tsx'
 import OverlayLegend from './OverlayLegend.tsx'
 import PageView from './PageView.tsx'
+import ReviewPanel from './ReviewPanel.tsx'
 
 type Deck = { doc: PDFDocumentProxy; pageTexts: PageText[] }
 
@@ -22,6 +24,8 @@ export default function App() {
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showOverlay, setShowOverlay] = useState(false)
+  // Values the user unchecked. Everything else is masked (fail closed).
+  const [unmasked, setUnmasked] = useState<ReadonlySet<string>>(new Set())
   // Ignores NER results that belong to a previous document.
   const run = useRef(0)
 
@@ -51,6 +55,20 @@ export default function App() {
     const found = nerDetections(texts, entities)
     return deck.pageTexts.map((page, i) => analyzePage(page, found[i]))
   }, [deck, entities])
+
+  const groups = useMemo(() => reviewGroups(pages), [pages])
+  const masks = useMemo(() => pages.map((page) => maskedRects(page, unmasked)), [pages, unmasked])
+
+  function setMasked(keys: string[], masked: boolean) {
+    setUnmasked((previous) => {
+      const next = new Set(previous)
+      for (const key of keys) {
+        if (masked) next.delete(key)
+        else next.add(key)
+      }
+      return next
+    })
+  }
 
   const nerRunning = ner.phase === 'download' || ner.phase === 'analyze'
 
@@ -87,7 +105,12 @@ export default function App() {
     if (!deck) return
     setError(null)
     try {
-      const bytes = await exportPdf(deck.doc, pages, (pageNumber) =>
+      const exportPages = pages.map((page, i) => ({
+        width: page.pageText.width,
+        height: page.pageText.height,
+        masks: masks[i],
+      }))
+      const bytes = await exportPdf(deck.doc, exportPages, (pageNumber) =>
         setStatus(`Exporting page ${pageNumber} of ${pages.length}…`),
       )
       downloadPdf(bytes)
@@ -103,6 +126,7 @@ export default function App() {
     setError(null)
     setDeck(null)
     setNer({ phase: 'idle' })
+    setUnmasked(new Set())
     setStatus('Opening the PDF…')
     let doc: PDFDocumentProxy
     try {
@@ -136,32 +160,37 @@ export default function App() {
       {error && <p role="alert" className="error">{error}</p>}
       <DebugPanel />
       {deck && (
-        <section className="pages">
-          <NerProgress state={ner} />
-          <div className="toolbar">
-            <button type="button" onClick={handleExport} disabled={status !== null || nerRunning}>
-              Export anonymized PDF
-            </button>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={showOverlay}
-                onChange={(event) => setShowOverlay(event.target.checked)}
+        <div className="workspace">
+          <section className="pages">
+            <NerProgress state={ner} />
+            <div className="toolbar">
+              <button type="button" onClick={handleExport} disabled={status !== null || nerRunning}>
+                Export anonymized PDF
+              </button>
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={showOverlay}
+                  onChange={(event) => setShowOverlay(event.target.checked)}
+                />
+                Show debug overlay
+              </label>
+            </div>
+            {showOverlay && <OverlayLegend />}
+            {pages.map((analysis, i) => (
+              <PageView
+                key={i + 1}
+                doc={deck.doc}
+                pageNumber={i + 1}
+                analysis={analysis}
+                masks={masks[i]}
+                unmasked={unmasked}
+                showOverlay={showOverlay}
               />
-              Show debug overlay
-            </label>
-          </div>
-          {showOverlay && <OverlayLegend />}
-          {pages.map((analysis, i) => (
-            <PageView
-              key={i + 1}
-              doc={deck.doc}
-              pageNumber={i + 1}
-              analysis={analysis}
-              showOverlay={showOverlay}
-            />
-          ))}
-        </section>
+            ))}
+          </section>
+          <ReviewPanel groups={groups} unmasked={unmasked} onChange={setMasked} />
+        </div>
       )}
     </main>
   )

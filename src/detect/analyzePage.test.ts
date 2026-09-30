@@ -15,14 +15,14 @@ describe('analyzePage', () => {
       [item('Write to invest@nimbalo.io or call +44', 300, true), item('20 7946 0958 about the $2M round.', 280)],
       viewport,
     )
-    const { detections, masks } = analyzePage(page)
+    const { detections, zones } = analyzePage(page)
     expect(detections.map((d) => d.type)).toEqual(['email', 'phone', 'amount'])
     // The phone number spans two lines: two masks.
-    expect(masks).toHaveLength(4)
+    expect(zones).toHaveLength(4)
   })
 
   it('masks nothing on a page without detections', () => {
     const page = buildPageText([item('One request in, one priced quote out', 300)], viewport)
-    expect(analyzePage(page).masks).toEqual([])
+    expect(analyzePage(page).zones).toEqual([])
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PageAnalysis } from '../detect/analyzePage.ts'
+import type { Rect } from '../pdf/textIndex.ts'
 import { isRenderCancelled, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import { blockRect, rangeToRects } from '../pdf/textIndex.ts'
 import { renderPage } from '../render/renderPage.ts'
@@ -8,15 +9,19 @@ type Props = {
   doc: PDFDocumentProxy
   pageNumber: number
   analysis: PageAnalysis
+  // The areas burned in black, as in the export.
+  masks: Rect[]
+  // Keys of the values the user unmasked: outlined in the preview only.
+  unmasked: ReadonlySet<string>
   showOverlay: boolean
 }
 
-export default function PageView({ doc, pageNumber, analysis, showOverlay }: Props) {
+export default function PageView({ doc, pageNumber, analysis, masks, unmasked, showOverlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [failed, setFailed] = useState(false)
 
   // Redraw only when this page's masks change, not on every NER update.
-  const masksKey = JSON.stringify(analysis.masks)
+  const masksKey = JSON.stringify(masks)
 
   useEffect(() => {
     let cancelled = false
@@ -57,12 +62,35 @@ export default function PageView({ doc, pageNumber, analysis, showOverlay }: Pro
     <figure className="page">
       <div className="page__sheet">
         <canvas ref={canvasRef} aria-label={`Page ${pageNumber}`} />
+        <UnmaskedOutlines analysis={analysis} unmasked={unmasked} />
         {showOverlay && <DebugOverlay analysis={analysis} />}
       </div>
       <figcaption>
         {failed ? `Page ${pageNumber} could not be rendered.` : `Page ${pageNumber}`}
       </figcaption>
     </figure>
+  )
+}
+
+// Unmasked zones keep a dotted outline, so the user sees what they chose
+// to reveal. Drawn above the canvas: never part of the export.
+function UnmaskedOutlines({ analysis, unmasked }: { analysis: PageAnalysis; unmasked: ReadonlySet<string> }) {
+  const zones = analysis.zones.filter((zone) => unmasked.has(zone.key))
+  if (zones.length === 0) return null
+  const { width, height } = analysis.pageText
+  return (
+    <svg className="page__overlay" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+      {zones.map((zone, i) => (
+        <rect
+          key={i}
+          className="unmasked-zone"
+          x={zone.rect.x}
+          y={zone.rect.y}
+          width={zone.rect.width}
+          height={zone.rect.height}
+        />
+      ))}
+    </svg>
   )
 }
 

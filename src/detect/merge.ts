@@ -1,7 +1,8 @@
 import type { NerEntity, NerType } from './ner.ts'
 import type { RuleType } from './rules.ts'
 
-export type DetectionType = RuleType | NerType
+// 'custom': a term the user asked to mask.
+export type DetectionType = RuleType | NerType | 'custom'
 
 // A sensitive value found at [start, end) in a page string.
 export type Detection = {
@@ -23,12 +24,18 @@ export function findOccurrences(text: string, value: string): { start: number; e
   return Array.from(text.matchAll(pattern), (m) => ({ start: m.index, end: m.index + m[0].length }))
 }
 
+// Two detections with the same key are the same value: they are masked or
+// unmasked together.
+export function valueKey(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
 // A NER entity is a value: it is masked wherever it occurs in the deck,
 // including pages where the model missed it.
 export function nerDetections(pageTexts: string[], entitiesPerPage: NerEntity[][]): Detection[][] {
   const values = new Map<string, NerEntity>()
   for (const entity of entitiesPerPage.flat()) {
-    const key = entity.value.toLowerCase()
+    const key = valueKey(entity.value)
     if (!values.has(key)) values.set(key, entity)
   }
   return pageTexts.map((text) =>
@@ -43,17 +50,18 @@ export function nerDetections(pageTexts: string[], entitiesPerPage: NerEntity[][
   )
 }
 
-// Rule and NER detections of one page, sorted by position. Exact duplicates
-// and detections inside a longer one (a name inside an email) are dropped;
-// partial overlaps are kept, so their masks cover both.
+// Rule and NER detections of one page, sorted by position, without exact
+// duplicates. A detection inside a longer one is kept: if the user unmasks
+// the longer one ("invest@nimbalo.io"), the shorter ("nimbalo") stays masked.
 export function mergeDetections(...lists: Detection[][]): Detection[] {
   const sorted = lists.flat().sort((a, b) => a.start - b.start || b.end - a.end)
-  const merged: Detection[] = []
-  let reach = -1
-  for (const detection of sorted) {
-    if (detection.end <= reach) continue
-    merged.push(detection)
-    reach = detection.end
-  }
-  return merged
+  return sorted.filter((detection, i) => {
+    const previous = sorted[i - 1]
+    return !(
+      previous &&
+      previous.start === detection.start &&
+      previous.end === detection.end &&
+      valueKey(previous.value) === valueKey(detection.value)
+    )
+  })
 }

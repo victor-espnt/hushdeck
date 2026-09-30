@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_DECK_PAGES } from './fixtures/sampleDeck.ts'
 import { SAMPLE_DECK_NER } from './fixtures/sampleDeckNer.ts'
-import { findOccurrences, mergeDetections, nerDetections, type Detection } from './merge.ts'
+import {
+  findOccurrences,
+  mergeDetections,
+  nerDetections,
+  valueKey,
+  type Detection,
+} from './merge.ts'
 import { aggregateEntities } from './ner.ts'
 
 describe('findOccurrences', () => {
@@ -59,20 +65,24 @@ describe('nerDetections on the sample deck', () => {
 })
 
 describe('mergeDetections', () => {
-  const d = (type: Detection['type'], start: number, end: number): Detection => ({
+  const d = (type: Detection['type'], start: number, end: number, value = ''): Detection => ({
     type,
-    value: '',
+    value,
     start,
     end,
   })
 
-  it('drops a detection inside a longer one', () => {
+  it('keeps a detection inside a longer one, so it stays masked on its own', () => {
     // "nimbalo" (NER) inside "invest@nimbalo.io" (rule).
-    expect(mergeDetections([d('email', 20, 37)], [d('organization', 27, 34)])).toEqual([d('email', 20, 37)])
+    const email = d('email', 20, 37, 'invest@nimbalo.io')
+    const name = d('organization', 27, 34, 'nimbalo')
+    expect(mergeDetections([email], [name])).toEqual([email, name])
   })
 
-  it('drops exact duplicates', () => {
-    expect(mergeDetections([d('person', 0, 13)], [d('person', 0, 13)])).toEqual([d('person', 0, 13)])
+  it('drops exact duplicates of the same value', () => {
+    expect(mergeDetections([d('person', 0, 13, 'Claire Dubois')], [d('person', 0, 13, 'claire  dubois')])).toEqual([
+      d('person', 0, 13, 'Claire Dubois'),
+    ])
   })
 
   it('keeps partial overlaps and sorts by position', () => {
@@ -81,5 +91,11 @@ describe('mergeDetections', () => {
       d('person', 10, 20),
       d('organization', 15, 30),
     ])
+  })
+})
+
+describe('valueKey', () => {
+  it('ignores case and whitespace differences', () => {
+    expect(valueKey(' Castellane\nTransports ')).toBe(valueKey('castellane transports'))
   })
 })

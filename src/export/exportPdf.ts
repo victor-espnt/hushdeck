@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib'
-import type { PageAnalysis } from '../detect/analyzePage.ts'
 import type { PDFDocumentProxy } from '../pdf/loadPdf.ts'
+import type { Rect } from '../pdf/textIndex.ts'
 import { renderPage } from '../render/renderPage.ts'
 
 export const EXPORT_SCALE = 2
@@ -9,6 +9,9 @@ export const JPEG_QUALITY = 0.85
 export const EXPORT_FILE_NAME = 'anonymized-deck.pdf'
 // Replaces pdf-lib's defaults; says nothing about the source document.
 export const NEUTRAL_PRODUCER = 'Hushdeck'
+
+// A page to export: its size in PDF points and the areas to burn.
+export type ExportPage = { width: number; height: number; masks: Rect[] }
 
 export type RasterPage = {
   jpeg: Uint8Array
@@ -36,21 +39,17 @@ export async function assemblePdf(pages: RasterPage[]): Promise<Uint8Array> {
 // included, and rebuilds the document from the images.
 export async function exportPdf(
   doc: PDFDocumentProxy,
-  analyses: PageAnalysis[],
+  pages: ExportPage[],
   onProgress: (pageNumber: number) => void,
 ): Promise<Uint8Array> {
-  const pages: RasterPage[] = []
+  const rasters: RasterPage[] = []
   const canvas = document.createElement('canvas')
   try {
-    for (const [i, analysis] of analyses.entries()) {
+    for (const [i, { width, height, masks }] of pages.entries()) {
       onProgress(i + 1)
       const page = await doc.getPage(i + 1)
-      await renderPage(page, canvas, analysis.masks, EXPORT_SCALE).promise
-      pages.push({
-        jpeg: await canvasToJpeg(canvas),
-        width: analysis.pageText.width,
-        height: analysis.pageText.height,
-      })
+      await renderPage(page, canvas, masks, EXPORT_SCALE).promise
+      rasters.push({ jpeg: await canvasToJpeg(canvas), width, height })
       page.cleanup()
     }
   } finally {
@@ -58,7 +57,7 @@ export async function exportPdf(
     canvas.width = 0
     canvas.height = 0
   }
-  return assemblePdf(pages)
+  return assemblePdf(rasters)
 }
 
 async function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array> {
