@@ -1,3 +1,4 @@
+import { blockAt, blockRect, type PageText } from '../pdf/textIndex.ts'
 import type { NerEntity, NerType } from './ner.ts'
 import type { RuleType } from './rules.ts'
 
@@ -73,4 +74,47 @@ export function termDetections(pageTexts: string[], terms: string[]): Detection[
       findOccurrences(text, term).map(({ start, end }) => ({ type: 'custom' as const, value: term, start, end })),
     ),
   )
+}
+
+// Line spacing and font size tolerances for lines of one visual block.
+const MAX_LINE_STEP = 1.5
+const FONT_TOLERANCE = 0.1
+
+// Re-joins an entity the model split at a line break ("Brightwater" /
+// "Logistics"), when the second piece continues it (I- label), both pieces
+// have the same type, and the two lines belong to one visual block: the
+// next line just below, same font size, overlapping horizontally. A footer
+// is never joined to the text above it: smaller font, far below.
+export function joinLineBreaks(page: PageText, entities: NerEntity[]): NerEntity[] {
+  const joined: NerEntity[] = []
+  for (const entity of [...entities].sort((a, b) => a.start - b.start)) {
+    const previous = joined.at(-1)
+    if (previous && entity.startsInside && previous.type === entity.type && sameBlock(page, previous, entity)) {
+      joined[joined.length - 1] = {
+        ...previous,
+        value: page.text.slice(previous.start, entity.end).replace(/\s+/g, ' '),
+        end: entity.end,
+        score: Math.max(previous.score, entity.score),
+      }
+    } else {
+      joined.push(entity)
+    }
+  }
+  return joined
+}
+
+function sameBlock(page: PageText, first: NerEntity, second: NerEntity): boolean {
+  const gap = page.text.slice(first.end, second.start)
+  if (!/^[^\S\n]*\n[^\S\n]*$/.test(gap)) return false
+  const above = blockAt(page, first.end - 1)
+  const below = blockAt(page, second.start)
+  if (!above || !below || above === below) return false
+  if (Math.abs(above.fontHeight - below.fontHeight) > FONT_TOLERANCE * above.fontHeight) return false
+  // Distance between baselines, across the text direction.
+  const step =
+    (above.originX - below.originX) * above.upX + (above.originY - below.originY) * above.upY
+  if (step <= 0 || step > MAX_LINE_STEP * above.fontHeight) return false
+  const a = blockRect(page, above)
+  const b = blockRect(page, below)
+  return a.x < b.x + b.width && b.x < a.x + a.width
 }

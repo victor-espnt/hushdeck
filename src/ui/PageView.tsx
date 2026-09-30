@@ -11,8 +11,9 @@ type Props = {
   analysis: PageAnalysis
   // The areas burned in black, as in the export.
   masks: Rect[]
-  // Keys of the values the user unmasked: outlined in the preview only.
-  unmasked: ReadonlySet<string>
+  isMasked: (key: string) => boolean
+  // The review row(s) a value belongs to, for the tooltip.
+  labelOf: (key: string) => string
   // Masks or unmasks a value everywhere in the deck.
   onToggle: (key: string) => void
   showOverlay: boolean
@@ -23,7 +24,8 @@ export default function PageView({
   pageNumber,
   analysis,
   masks,
-  unmasked,
+  isMasked,
+  labelOf,
   onToggle,
   showOverlay,
 }: Props) {
@@ -72,7 +74,7 @@ export default function PageView({
     <figure className="page">
       <div className="page__sheet">
         <canvas ref={canvasRef} aria-label={`Page ${pageNumber}`} />
-        <ZoneLayer analysis={analysis} unmasked={unmasked} onToggle={onToggle} />
+        <ZoneLayer analysis={analysis} isMasked={isMasked} labelOf={labelOf} onToggle={onToggle} />
         {showOverlay && <DebugOverlay analysis={analysis} />}
       </div>
       <figcaption>
@@ -87,13 +89,12 @@ export default function PageView({
 // user sees what they chose to reveal. Never part of the export.
 function ZoneLayer({
   analysis,
-  unmasked,
+  isMasked,
+  labelOf,
   onToggle,
 }: {
   analysis: PageAnalysis
-  unmasked: ReadonlySet<string>
-  onToggle: (key: string) => void
-}) {
+} & Pick<Props, 'isMasked' | 'labelOf' | 'onToggle'>) {
   const { width, height } = analysis.pageText
   // Larger zones first, so a zone inside another stays clickable on top.
   const zones = [...analysis.zones].sort(
@@ -102,7 +103,7 @@ function ZoneLayer({
   return (
     <svg className="page__overlay zone-layer" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
       {zones.map((zone, i) => {
-        const isUnmasked = unmasked.has(zone.key)
+        const isUnmasked = !isMasked(zone.key)
         return (
           <rect
             key={i}
@@ -113,7 +114,7 @@ function ZoneLayer({
             height={zone.rect.height}
             onClick={() => onToggle(zone.key)}
           >
-            <title>{`${isUnmasked ? 'Mask' : 'Unmask'} "${zone.value}" everywhere`}</title>
+            <title>{`${isUnmasked ? 'Mask' : 'Unmask'} "${labelOf(zone.key)}" everywhere`}</title>
           </rect>
         )
       })}

@@ -4,11 +4,12 @@ import type {
   SmokeTestResponse,
   SmokeTestResult,
 } from './nerSmokeTest.worker.ts'
+import SmokeTestWorker from './nerSmokeTest.worker.ts?worker&inline'
 
 // Debug only: runs the NER model on page 7 of the fictional sample deck,
 // never on the user's document, and logs what it costs.
 export function runNerSmokeTest(): Promise<SmokeTestResult> {
-  const worker = new Worker(new URL('./nerSmokeTest.worker.ts', import.meta.url), { type: 'module' })
+  const worker = new SmokeTestWorker()
   return new Promise<SmokeTestResult>((resolve, reject) => {
     worker.onmessage = (event: MessageEvent<SmokeTestResponse>) => {
       if (event.data.type === 'result') resolve(event.data.result)

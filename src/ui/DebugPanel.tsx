@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { runNerSmokeTest } from '../debug/nerSmokeTest.ts'
 
 // Debug tools. The NER smoke test runs on the fictional sample deck only.
 export default function DebugPanel() {
@@ -10,6 +9,8 @@ export default function DebugPanel() {
     setRunning(true)
     setSummary('Running the NER smoke test… (see the console)')
     try {
+      // Loaded on demand: the smoke test and its worker stay out of the page.
+      const { runNerSmokeTest } = await import('../debug/nerSmokeTest.ts')
       const result = await runNerSmokeTest()
       setSummary(
         `NER smoke test: ${(result.downloadedBytes / 1e6).toFixed(1)} MB downloaded, ` +

@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { analyzePage, extractDocumentText, maskedRects } from '../detect/analyzePage.ts'
-import { findOccurrences, nerDetections, termDetections, valueKey } from '../detect/merge.ts'
+import {
+  findOccurrences,
+  joinLineBreaks,
+  nerDetections,
+  termDetections,
+  valueKey,
+} from '../detect/merge.ts'
 import type { NerEntity } from '../detect/ner.ts'
-import { detectEntities } from '../detect/nerClient.ts'
-import { reviewGroups } from '../detect/review.ts'
+import type { NerHandlers } from '../detect/nerClient.ts'
+import { buildReview } from '../detect/review.ts'
 import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
 import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import type { PageText } from '../pdf/textIndex.ts'
@@ -54,13 +60,24 @@ export default function App() {
   const pages = useMemo(() => {
     if (!deck) return []
     const texts = deck.pageTexts.map((page) => page.text)
-    const found = nerDetections(texts, entities)
+    const joined = deck.pageTexts.map((page, i) => joinLineBreaks(page, entities[i] ?? []))
+    const found = nerDetections(texts, joined)
     const custom = termDetections(texts, customTerms)
     return deck.pageTexts.map((page, i) => analyzePage(page, [...found[i], ...custom[i]]))
   }, [deck, entities, customTerms])
 
-  const groups = useMemo(() => reviewGroups(pages), [pages])
-  const masks = useMemo(() => pages.map((page) => maskedRects(page, unmasked)), [pages, unmasked])
+  const review = useMemo(() => buildReview(pages), [pages])
+  // Fail closed: a value is masked unless the user unchecked every row it
+  // belongs to.
+  const isMasked = useCallback(
+    (key: string) => !review.rowsOf(key).every((row) => unmasked.has(row)),
+    [review, unmasked],
+  )
+  const masks = useMemo(() => pages.map((page) => maskedRects(page, isMasked)), [pages, isMasked])
+  const labels = useMemo(
+    () => new Map(review.groups.flatMap((group) => group.rows.map((row) => [row.key, row.value]))),
+    [review],
+  )
 
   function setMasked(keys: string[], masked: boolean) {
     setUnmasked((previous) => {
@@ -84,12 +101,13 @@ export default function App() {
       setCustomTerms([...customTerms, term])
     }
     // Adding a term the user had unmasked masks it again.
-    setMasked([valueKey(term)], true)
+    setMasked(review.rowsOf(valueKey(term)), true)
     return null
   }
 
+  // A click on a zone flips every row its value belongs to.
   function toggle(key: string) {
-    setMasked([key], unmasked.has(key))
+    setMasked(review.rowsOf(key), !isMasked(key))
   }
 
   const nerRunning = ner.phase === 'download' || ner.phase === 'analyze'
@@ -99,7 +117,7 @@ export default function App() {
     const texts = pageTexts.map((page) => page.text)
     setEntities([])
     setNer({ phase: 'download', loaded: 0, total: 0 })
-    detectEntities(texts, {
+    const handlers: NerHandlers = {
       onDownload: (loaded, total) => {
         if (run.current === current) setNer({ phase: 'download', loaded, total })
       },
@@ -112,7 +130,10 @@ export default function App() {
         })
         setNer({ phase: 'analyze', done: pageIndex + 1, total: texts.length })
       },
-    })
+    }
+    // The NER client, and its inline worker, load on demand.
+    import('../detect/nerClient.ts')
+      .then(({ detectEntities }) => detectEntities(texts, handlers))
       .then(() => {
         if (run.current === current) setNer({ phase: 'done' })
       })
@@ -207,14 +228,15 @@ export default function App() {
                 pageNumber={i + 1}
                 analysis={analysis}
                 masks={masks[i]}
-                unmasked={unmasked}
+                isMasked={isMasked}
+                labelOf={(key) => review.rowsOf(key).map((row) => labels.get(row) ?? row).join(', ')}
                 onToggle={toggle}
                 showOverlay={showOverlay}
               />
             ))}
           </section>
           <ReviewPanel
-            groups={groups}
+            groups={review.groups}
             unmasked={unmasked}
             onChange={setMasked}
             onAddTerm={addTerm}

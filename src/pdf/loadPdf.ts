@@ -8,10 +8,18 @@ import {
   type PDFPageProxy,
   type RenderTask,
 } from 'pdfjs-dist'
-// Vite pitfall: pdf.js needs the URL of its worker file, not the module itself.
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+let workerPort: Promise<Worker> | undefined
 
-GlobalWorkerOptions.workerSrc = workerUrl
+// One pdf.js worker for the whole session, started on first use. Inline:
+// it starts from a blob: URL and so inherits the page's
+// Content-Security-Policy, which a worker loaded from its own URL does not.
+// Imported on demand to keep it out of the initial download.
+async function startWorker() {
+  workerPort ??= import('pdfjs-dist/build/pdf.worker.min.mjs?worker&inline').then(
+    ({ default: PdfJsWorker }) => new PdfJsWorker(),
+  )
+  GlobalWorkerOptions.workerPort = await workerPort
+}
 
 export type { PDFDocumentProxy, PDFPageProxy }
 
@@ -19,6 +27,7 @@ export type { PDFDocumentProxy, PDFPageProxy }
 export const RENDER_SCALE = 2
 
 export async function loadPdf(file: File): Promise<PDFDocumentProxy> {
+  await startWorker()
   const data = new Uint8Array(await file.arrayBuffer())
   return getDocument({ data, verbosity: VerbosityLevel.ERRORS }).promise
 }

@@ -16,6 +16,9 @@ export type NerEntity = {
   start: number
   end: number
   score: number
+  // The first word has an I- label: the model reads it as the continuation
+  // of an entity, for instance one cut by a line break.
+  startsInside: boolean
 }
 
 // Low on purpose: an uncertain entity is masked, the user can unmask it.
@@ -97,7 +100,7 @@ function labelOf(entity: string): { prefix: string; type: NerType | undefined } 
 // Entities of one chunk of text, with offsets into that text.
 export function aggregateEntities(text: string, tokens: NerToken[]): NerEntity[] {
   const entities: NerEntity[] = []
-  let current: { type: NerType; start: number; end: number; score: number } | undefined
+  let current: Omit<NerEntity, 'value'> | undefined
 
   const close = () => {
     if (current) entities.push(...finish(text, current))
@@ -120,7 +123,7 @@ export function aggregateEntities(text: string, tokens: NerToken[]): NerEntity[]
       current.score = Math.max(current.score, word.score)
     } else {
       close()
-      current = { type, start: word.start, end: word.end, score: word.score }
+      current = { type, start: word.start, end: word.end, score: word.score, startsInside: prefix === 'I' }
     }
   }
   close()
@@ -129,10 +132,7 @@ export function aggregateEntities(text: string, tokens: NerToken[]): NerEntity[]
 
 // Extends an entity to the word boundaries in the text, trims punctuation
 // at its ends, and drops it below the score threshold or at one character.
-function finish(
-  text: string,
-  entity: { type: NerType; start: number; end: number; score: number },
-): NerEntity[] {
+function finish(text: string, entity: Omit<NerEntity, 'value'>): NerEntity[] {
   if (entity.score < MIN_ENTITY_SCORE) return []
   let { start, end } = entity
   while (start > 0 && WORD_CHAR.test(text[start - 1])) start--
@@ -141,5 +141,5 @@ function finish(
   while (end > start && !WORD_CHAR.test(text[end - 1])) end--
   const value = text.slice(start, end).replace(/\s+/g, ' ')
   if ([...value].filter((char) => WORD_CHAR.test(char)).length < 2) return []
-  return [{ type: entity.type, value, start, end, score: entity.score }]
+  return [{ ...entity, value, start, end }]
 }

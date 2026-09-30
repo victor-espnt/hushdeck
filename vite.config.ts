@@ -26,7 +26,8 @@ function dropUnusedOnnxRuntime(): Plugin {
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
-  "worker-src 'self'",
+  // Workers start from blob: URLs so that they inherit this policy.
+  "worker-src 'self' blob:",
   "connect-src 'self' https://huggingface.co https://*.hf.co",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",

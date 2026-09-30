@@ -32,9 +32,9 @@ export function analyzePage(pageText: PageText, extra: Detection[] = []): PageAn
   return { pageText, detections, zones }
 }
 
-// Fail closed: a zone is masked unless the user unmasked its value.
-export function maskedRects(page: PageAnalysis, unmasked: ReadonlySet<string>): Rect[] {
-  return page.zones.filter((zone) => !unmasked.has(zone.key)).map((zone) => zone.rect)
+// The areas to burn: the zones whose value is masked.
+export function maskedRects(page: PageAnalysis, isMasked: (key: string) => boolean): Rect[] {
+  return page.zones.filter((zone) => isMasked(zone.key)).map((zone) => zone.rect)
 }
 
 // The text index of every page, in page order.

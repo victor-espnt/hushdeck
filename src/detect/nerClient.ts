@@ -1,5 +1,8 @@
 import type { NerEntity } from './ner.ts'
 import type { NerRequest, NerResponse } from './ner.worker.ts'
+// Inline: the worker starts from a blob: URL and so inherits the page's
+// Content-Security-Policy, which a worker loaded from its own URL does not.
+import NerWorker from './ner.worker.ts?worker&inline'
 
 export type NerHandlers = {
   onDownload: (loaded: number, total: number) => void
@@ -17,7 +20,7 @@ export function detectEntities(pages: string[], handlers: NerHandlers): Promise<
     worker?.terminate()
     worker = undefined
   }
-  worker ??= new Worker(new URL('./ner.worker.ts', import.meta.url), { type: 'module' })
+  worker ??= new NerWorker()
   const current = worker
   busy = true
   return new Promise<void>((resolve, reject) => {

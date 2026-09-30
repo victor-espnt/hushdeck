@@ -63,7 +63,7 @@ function ReviewGroupList({
   unmasked,
   onChange,
 }: { group: ReviewGroup } & Pick<Props, 'unmasked' | 'onChange'>) {
-  const keys = group.values.map((value) => value.key)
+  const keys = group.rows.map((row) => row.key)
   const maskedCount = keys.filter((key) => !unmasked.has(key)).length
   const all = maskedCount === keys.length
   const none = maskedCount === 0
@@ -86,17 +86,17 @@ function ReviewGroupList({
         {group.label} <span className="review__count">{maskedCount}/{keys.length}</span>
       </label>
       <ul>
-        {group.values.map((value) => (
-          <li key={value.key}>
+        {group.rows.map((row) => (
+          <li key={row.key}>
             <label>
               <input
                 type="checkbox"
-                checked={!unmasked.has(value.key)}
-                onChange={(event) => onChange([value.key], event.target.checked)}
+                checked={!unmasked.has(row.key)}
+                onChange={(event) => onChange([row.key], event.target.checked)}
               />
-              <span className="review__value">{value.value}</span>
-              <span className="review__count" title={`${value.count} occurrences in the deck`}>
-                ×{value.count}
+              <span className="review__value">{row.value}</span>
+              <span className="review__count" title={`${row.count} occurrences in the deck`}>
+                ×{row.count}
               </span>
             </label>
           </li>
