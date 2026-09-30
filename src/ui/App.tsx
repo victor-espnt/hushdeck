@@ -11,7 +11,8 @@ import type { NerEntity } from '../detect/ner.ts'
 import type { NerHandlers } from '../detect/nerClient.ts'
 import { buildReview } from '../detect/review.ts'
 import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
-import { loadErrorMessage, loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
+import { fileSizeProblem, loadErrorMessage, textLayerNotice } from '../pdf/fileChecks.ts'
+import { loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import type { PageText, Rect } from '../pdf/textIndex.ts'
 import type { ManualArea } from '../render/manualArea.ts'
 import DebugPanel from './DebugPanel.tsx'
@@ -21,7 +22,12 @@ import OverlayLegend from './OverlayLegend.tsx'
 import PageView from './PageView.tsx'
 import ReviewPanel from './ReviewPanel.tsx'
 
-type Deck = { doc: PDFDocumentProxy; pageTexts: PageText[] }
+type Deck = {
+  doc: PDFDocumentProxy
+  pageTexts: PageText[]
+  // Pages without a text layer, where nothing can be detected.
+  textNotice: string | null
+}
 
 export default function App() {
   const [deck, setDeck] = useState<Deck | null>(null)
@@ -206,6 +212,12 @@ export default function App() {
     setUnmasked(new Set())
     setCustomTerms([])
     setManualAreas([])
+    const tooLarge = fileSizeProblem(file.size)
+    if (tooLarge) {
+      setError(tooLarge)
+      setStatus(null)
+      return
+    }
     setStatus('Opening the PDF…')
     let doc: PDFDocumentProxy
     try {
@@ -220,8 +232,9 @@ export default function App() {
     setStatus('Reading the text…')
     try {
       const pageTexts = await extractDocumentText(doc)
-      setDeck({ doc, pageTexts })
-      runNer(pageTexts)
+      setDeck({ doc, pageTexts, textNotice: textLayerNotice(pageTexts) })
+      // Without any text, there is nothing for the model to read.
+      if (pageTexts.some((page) => page.text.trim() !== '')) runNer(pageTexts)
     } catch {
       doc.loadingTask.destroy()
       setError('The text of this PDF could not be read.')
@@ -241,6 +254,11 @@ export default function App() {
       {deck && (
         <div className="workspace">
           <section className="pages">
+            {deck.textNotice && (
+              <p role="alert" className="notice">
+                {deck.textNotice}
+              </p>
+            )}
             <NerProgress state={ner} />
             <div className="toolbar">
               <button type="button" onClick={handleExport} disabled={status !== null || nerRunning}>

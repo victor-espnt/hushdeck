@@ -1,7 +1,6 @@
 import {
   getDocument,
   GlobalWorkerOptions,
-  PasswordException,
   RenderingCancelledException,
   VerbosityLevel,
   type PDFDocumentProxy,
@@ -32,12 +31,6 @@ export async function loadPdf(file: File): Promise<PDFDocumentProxy> {
   return getDocument({ data, verbosity: VerbosityLevel.ERRORS }).promise
 }
 
-export function loadErrorMessage(err: unknown): string {
-  if (err instanceof PasswordException) {
-    return 'This PDF is password-protected. Remove the password and try again.'
-  }
-  return 'This file could not be read as a PDF.'
-}
 
 export function renderPageToCanvas(
   page: PDFPageProxy,

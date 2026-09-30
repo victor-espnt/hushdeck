@@ -61,6 +61,13 @@ body {
   color: var(--danger);
 }
 
+.notice {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
 .pages {
   display: flex;
   flex-direction: column;
