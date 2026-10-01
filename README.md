@@ -123,12 +123,9 @@ The dev server does not apply the Content-Security-Policy, because Vite needs in
 
 ## How this was built
 
-Hushdeck was built over two evenings with [Claude Code](https://claude.com/claude-code). I wrote the specification ([CLAUDE.md](CLAUDE.md)) and the step-by-step plan, made the product decisions, and checked every step by hand. Claude Code wrote the code. The work followed the plan one step at a time, with one commit per step: 26 commits and 90 unit tests at the time of writing.
-
-Checking by hand changed the product more than once. Two examples:
-
-- The review panel listed "Claire" and "Claire Dubois" on two separate rows, so unchecking the full name left the first name masked elsewhere. The panel now groups the variants of an entity into one row.
-- The logo of the sample deck survived the export: it is an image, and there is no text to detect in it. Manual areas moved into scope.
+Built in one evening with [Claude Code](https://claude.com/claude-code).
+[CLAUDE.md](CLAUDE.md) served as the specification, with one commit per step.
+Method, decisions and timeline: [docs/BUILD.md](docs/BUILD.md).
 
 ## What's next
 
