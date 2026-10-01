@@ -42,9 +42,11 @@ describe('nerDetections on the sample deck', () => {
     detections[n - 1].map((d) => SAMPLE_DECK_PAGES[n - 1].slice(d.start, d.end))
 
   it('masks Nimbalo on pages where the model missed it', () => {
-    // The model finds no entity on pages 4 and 6; their footers say Nimbalo.
+    // The model finds no entity on pages 4 and 6, and misses the footer on
+    // page 8; all three footers say Nimbalo.
     expect(found(4)).toEqual(['Nimbalo'])
     expect(found(6)).toEqual(['Nimbalo'])
+    expect(found(8)).toContain('Nimbalo')
   })
 
   it('masks every occurrence of a person found on another page', () => {

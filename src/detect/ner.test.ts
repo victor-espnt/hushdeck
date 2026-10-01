@@ -75,9 +75,9 @@ describe('aggregateEntities on the model output for page 7', () => {
 })
 
 describe('Nimbalo, as the model really sees it', () => {
-  it('is found on pages 2, 3, 5, 7, 8 and 9, not on 1, 4 and 6', () => {
+  it('is found on pages 2, 3, 5, 7 and 9, not on 1, 4, 6 and 8', () => {
     const found = SAMPLE_DECK_PAGES.map((_, i) => values(i + 1).includes('Nimbalo'))
-    expect(found).toEqual([false, true, true, false, true, false, true, true, true])
+    expect(found).toEqual([false, true, true, false, true, false, true, false, true])
   })
 
   it('is tagged a person on some pages and an organization on others', () => {

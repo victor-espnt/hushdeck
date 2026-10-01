@@ -58,11 +58,9 @@ The plan was a starting point. These changes came from something observed during
 
 ## What is not validated
 
-Every hypothesis tested here is technical. None is about demand. I have not yet put Hushdeck in front of founders or investors. So I do not know whether they would use it, at which point in their workflow, or whether the review step is acceptable on a 40-page deck. That is the next test: five founders and five investors, one real deck each, watched rather than surveyed. <!-- Victor: adjust or remove this commitment -->
+Every hypothesis tested here is technical. None is about demand. I have not yet put Hushdeck in front of founders or investors. So I do not know whether they would use it, at which point in their workflow, or whether the review step is acceptable on a 40-page deck. That is the next test: five founders and five investors, one real deck each, watched rather than surveyed.
 
 ## Timeline
-
-<!-- Victor: check these times against git log before publishing -->
 
 | Time (CEST) | Milestone |
 |---|---|
