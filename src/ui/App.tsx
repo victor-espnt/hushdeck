@@ -16,7 +16,8 @@ import { loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import type { PageText, Rect } from '../pdf/textIndex.ts'
 import type { ManualArea } from '../render/manualArea.ts'
 import DebugPanel from './DebugPanel.tsx'
-import DropZone from './DropZone.tsx'
+import Home from './Home.tsx'
+import Logo from './Logo.tsx'
 import NerProgress, { type NerState } from './NerProgress.tsx'
 import OverlayLegend from './OverlayLegend.tsx'
 import PageView from './PageView.tsx'
@@ -46,6 +47,9 @@ export default function App() {
   const nextAreaId = useRef(1)
   // Ignores NER results that belong to a previous document.
   const run = useRef(0)
+  // One file input for every "choose a PDF" control.
+  const fileInput = useRef<HTMLInputElement>(null)
+  const openPicker = () => fileInput.current?.click()
 
   // A file dropped outside the drop zone must not make the browser open it.
   useEffect(() => {
@@ -243,63 +247,98 @@ export default function App() {
     }
   }
 
+  const picker = (
+    <input
+      ref={fileInput}
+      type="file"
+      accept="application/pdf,.pdf"
+      hidden
+      onChange={(event) => {
+        const file = event.target.files?.[0]
+        if (file) handleFile(file)
+        // Allow picking the same file again.
+        event.target.value = ''
+      }}
+    />
+  )
+
+  if (!deck) {
+    return (
+      <>
+        <Home
+          onFile={handleFile}
+          onSample={handleSample}
+          onOpenPicker={openPicker}
+          status={status}
+          error={error}
+        />
+        <div className="home__debug">
+          <DebugPanel />
+        </div>
+        {picker}
+      </>
+    )
+  }
+
   return (
     <main className="app">
-      <h1>Hushdeck</h1>
-      <p>Anonymize pitch decks in your browser. Nothing leaves your device.</p>
-      <DropZone onFile={handleFile} onSample={handleSample} disabled={status !== null} />
+      <header className="topbar">
+        <Logo size="small" />
+        <button type="button" onClick={openPicker} disabled={status !== null}>
+          Open another deck
+        </button>
+      </header>
+      {picker}
       {status && <p role="status">{status}</p>}
       {error && <p role="alert" className="error">{error}</p>}
-      <DebugPanel />
-      {deck && (
-        <div className="workspace">
-          <section className="pages">
-            {deck.textNotice && (
-              <p role="alert" className="notice">
-                {deck.textNotice}
-              </p>
-            )}
-            <NerProgress state={ner} />
-            <div className="toolbar">
-              <button type="button" onClick={handleExport} disabled={status !== null || nerRunning}>
-                Export anonymized PDF
-              </button>
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={showOverlay}
-                  onChange={(event) => setShowOverlay(event.target.checked)}
-                />
-                Show debug overlay
-              </label>
-            </div>
-            {showOverlay && <OverlayLegend />}
-            {pages.map((analysis, i) => (
-              <PageView
-                key={i + 1}
-                doc={deck.doc}
-                pageNumber={i + 1}
-                analysis={analysis}
-                masks={masks[i]}
-                isMasked={isMasked}
-                labelOf={(key) => review.rowsOf(key).map((row) => labels.get(row) ?? row).join(', ')}
-                onToggle={toggle}
-                manualAreas={manualAreas.filter((area) => area.page === i)}
-                onDrawArea={(rect) => drawArea(i, rect)}
-                showOverlay={showOverlay}
+      <div className="workspace">
+        <section className="pages">
+          {deck.textNotice && (
+            <p role="alert" className="notice">
+              {deck.textNotice}
+            </p>
+          )}
+          <NerProgress state={ner} />
+          <div className="toolbar">
+            <button type="button" onClick={handleExport} disabled={status !== null || nerRunning}>
+              Export anonymized PDF
+            </button>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={showOverlay}
+                onChange={(event) => setShowOverlay(event.target.checked)}
               />
-            ))}
-          </section>
-          <ReviewPanel
-            groups={review.groups}
-            unmasked={unmasked}
-            onChange={setMasked}
-            onAddTerm={addTerm}
-            manualAreas={manualAreas}
-            onRemoveArea={removeArea}
-          />
-        </div>
-      )}
+              Show debug overlay
+            </label>
+          </div>
+          {showOverlay && <OverlayLegend />}
+          {pages.map((analysis, i) => (
+            <PageView
+              key={i + 1}
+              doc={deck.doc}
+              pageNumber={i + 1}
+              analysis={analysis}
+              masks={masks[i]}
+              isMasked={isMasked}
+              labelOf={(key) => review.rowsOf(key).map((row) => labels.get(row) ?? row).join(', ')}
+              onToggle={toggle}
+              manualAreas={manualAreas.filter((area) => area.page === i)}
+              onDrawArea={(rect) => drawArea(i, rect)}
+              showOverlay={showOverlay}
+            />
+          ))}
+        </section>
+        <ReviewPanel
+          groups={review.groups}
+          unmasked={unmasked}
+          onChange={setMasked}
+          onAddTerm={addTerm}
+          manualAreas={manualAreas}
+          onRemoveArea={removeArea}
+        />
+      </div>
+      <DebugPanel />
     </main>
   )
 }

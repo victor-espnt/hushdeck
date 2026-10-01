@@ -1,13 +1,14 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useState, type DragEvent } from 'react'
 
 type Props = {
   onFile: (file: File) => void
-  onSample: () => void
+  // Opens the file picker.
+  onOpen: () => void
   disabled?: boolean
 }
 
-export default function DropZone({ onFile, onSample, disabled }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
+// A large target for a dropped PDF. Clicking it opens the file picker.
+export default function DropZone({ onFile, onOpen, disabled }: Props) {
   const [dragging, setDragging] = useState(false)
 
   function handleDrop(event: DragEvent) {
@@ -18,8 +19,11 @@ export default function DropZone({ onFile, onSample, disabled }: Props) {
   }
 
   return (
-    <div
+    <button
+      type="button"
       className={`dropzone${dragging ? ' dropzone--active' : ''}`}
+      disabled={disabled}
+      onClick={onOpen}
       onDragOver={(event) => {
         event.preventDefault()
         setDragging(true)
@@ -27,29 +31,8 @@ export default function DropZone({ onFile, onSample, disabled }: Props) {
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
     >
-      <p>Drop a PDF here</p>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => inputRef.current?.click()}
-      >
-        Choose a file
-      </button>
-      <button type="button" className="dropzone__sample" disabled={disabled} onClick={onSample}>
-        Try with a sample deck
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        hidden
-        onChange={(event) => {
-          const file = event.target.files?.[0]
-          if (file) onFile(file)
-          // Allow picking the same file again.
-          event.target.value = ''
-        }}
-      />
-    </div>
+      <span className="dropzone__title">Drop a PDF here</span>
+      <span className="dropzone__note">It is read in this tab and never uploaded.</span>
+    </button>
   )
 }

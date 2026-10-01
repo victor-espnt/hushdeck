@@ -2,6 +2,182 @@ body {
   margin: 0;
 }
 
+/* Controls */
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 6px 12px;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.button--primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 500;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a {
+  color: inherit;
+}
+
+/* Logo: "Hush" and a black bar over "deck", lifted on hover and focus. */
+
+.logo {
+  display: inline-flex;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.logo--large {
+  font-size: var(--text-xl);
+}
+
+.logo--small {
+  font-size: var(--text-l);
+}
+
+.logo__deck {
+  position: relative;
+}
+
+.logo__deck::after {
+  content: '';
+  position: absolute;
+  inset: 0.14em -0.04em 0.1em;
+  background: var(--mask);
+  transform-origin: right;
+  transition: transform var(--transition);
+}
+
+.logo:hover .logo__deck::after,
+.logo:focus-visible .logo__deck::after {
+  transform: scaleX(0);
+}
+
+/* Home */
+
+.home {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 96px 16px 48px;
+  text-align: center;
+}
+
+.home__logo {
+  margin: 0;
+  font-size: inherit;
+}
+
+.home__tagline {
+  margin: 12px 0 32px;
+  font-size: var(--text-l);
+  color: var(--muted);
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 56px 16px;
+  border: 1px dashed var(--muted);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition:
+    background-color var(--transition),
+    border-color var(--transition);
+}
+
+.dropzone:hover:not(:disabled),
+.dropzone--active {
+  border-color: var(--ink);
+  background: rgb(242 214 59 / 0.35);
+}
+
+.dropzone__title {
+  font-size: var(--text-l);
+  font-weight: 500;
+}
+
+.dropzone__note {
+  font-size: var(--text-s);
+  color: var(--muted);
+}
+
+.home__status {
+  margin: 16px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+}
+
+.home__error {
+  margin: 16px 0 0;
+  color: var(--exposed);
+}
+
+.home__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.home__points {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+  margin: 48px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-s);
+  color: var(--muted);
+}
+
+.home__points li::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--local);
+  vertical-align: middle;
+}
+
+.home__debug {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
 .app {
   max-width: 1280px;
   margin: 0 auto;
@@ -10,26 +186,6 @@ body {
 
 .app > p {
   color: var(--muted);
-}
-
-.dropzone {
-  margin: 24px 0;
-  padding: 32px 16px;
-  border: 2px dashed var(--line);
-  border-radius: 8px;
-  text-align: center;
-}
-
-.dropzone__sample {
-  margin-left: 8px;
-}
-
-.dropzone--active {
-  border-color: var(--ink);
-}
-
-.dropzone p {
-  margin: 0 0 12px;
 }
 
 .error {
