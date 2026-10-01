@@ -3,7 +3,7 @@ import type { PageAnalysis } from '../detect/analyzePage.ts'
 import type { Rect } from '../pdf/textIndex.ts'
 import { isRenderCancelled, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import { blockRect, rangeToRects } from '../pdf/textIndex.ts'
-import { rectFromCorners, type ManualArea } from '../render/manualArea.ts'
+import { manualAreaKey, rectFromCorners, type ManualArea } from '../render/manualArea.ts'
 import { renderPage } from '../render/renderPage.ts'
 
 type Props = {
@@ -14,6 +14,8 @@ type Props = {
   // The areas burned in black, as in the export.
   masks: Rect[]
   isMasked: (key: string) => boolean
+  // Zones of the review row under the pointer, drawn in yellow.
+  isHighlighted: (key: string) => boolean
   // The review row(s) a value belongs to, for the tooltip.
   labelOf: (key: string) => string
   // Masks or unmasks a value everywhere in the deck.
@@ -31,6 +33,7 @@ export default function PageView({
   analysis,
   masks,
   isMasked,
+  isHighlighted,
   labelOf,
   onToggle,
   manualAreas,
@@ -80,15 +83,22 @@ export default function PageView({
 
   return (
     <figure className="page">
-      <div className="page__sheet">
+      <div className="page__sheet" id={`page-${pageNumber}`}>
         <canvas ref={canvasRef} aria-label={`Page ${pageNumber}`} />
         <DrawLayer
           width={analysis.pageText.width}
           height={analysis.pageText.height}
           manualAreas={manualAreas}
+          isHighlighted={isHighlighted}
           onDrawArea={onDrawArea}
         />
-        <ZoneLayer analysis={analysis} isMasked={isMasked} labelOf={labelOf} onToggle={onToggle} />
+        <ZoneLayer
+          analysis={analysis}
+          isMasked={isMasked}
+          isHighlighted={isHighlighted}
+          labelOf={labelOf}
+          onToggle={onToggle}
+        />
         {showOverlay && <DebugOverlay analysis={analysis} />}
       </div>
       <figcaption className="page__number">
@@ -103,8 +113,9 @@ function DrawLayer({
   width,
   height,
   manualAreas,
+  isHighlighted,
   onDrawArea,
-}: { width: number; height: number } & Pick<Props, 'manualAreas' | 'onDrawArea'>) {
+}: { width: number; height: number } & Pick<Props, 'manualAreas' | 'isHighlighted' | 'onDrawArea'>) {
   const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
 
   // Pointer position in page units.
@@ -154,7 +165,7 @@ function DrawLayer({
       {manualAreas.map((area) => (
         <rect
           key={area.id}
-          className="manual-area"
+          className={isHighlighted(manualAreaKey(area.id)) ? 'manual-area manual-area--highlight' : 'manual-area'}
           x={area.rect.x}
           y={area.rect.y}
           width={area.rect.width}
@@ -180,11 +191,12 @@ function DrawLayer({
 function ZoneLayer({
   analysis,
   isMasked,
+  isHighlighted,
   labelOf,
   onToggle,
 }: {
   analysis: PageAnalysis
-} & Pick<Props, 'isMasked' | 'labelOf' | 'onToggle'>) {
+} & Pick<Props, 'isMasked' | 'isHighlighted' | 'labelOf' | 'onToggle'>) {
   const { width, height } = analysis.pageText
   // Larger zones first, so a zone inside another stays clickable on top.
   const zones = [...analysis.zones].sort(
@@ -197,7 +209,13 @@ function ZoneLayer({
         return (
           <rect
             key={i}
-            className={isUnmasked ? 'zone zone--unmasked' : 'zone'}
+            className={[
+              'zone',
+              isUnmasked && 'zone--unmasked',
+              isHighlighted(zone.key) && 'zone--highlight',
+            ]
+              .filter(Boolean)
+              .join(' ')}
             x={zone.rect.x}
             y={zone.rect.y}
             width={zone.rect.width}

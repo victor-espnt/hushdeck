@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { ReviewGroup } from '../detect/review.ts'
-import type { ManualArea } from '../render/manualArea.ts'
+import { manualAreaKey, type ManualArea } from '../render/manualArea.ts'
 
 type Props = {
   groups: ReviewGroup[]
@@ -11,6 +11,10 @@ type Props = {
   onAddTerm: (term: string) => string | null
   manualAreas: ManualArea[]
   onRemoveArea: (id: number) => void
+  // Highlights a row's zones on the pages (null: none).
+  onHighlight: (key: string | null) => void
+  // Scrolls the pages to a row's first occurrence.
+  onReveal: (key: string) => void
 }
 
 // Checked means masked. Everything starts checked (fail closed).
@@ -21,19 +25,76 @@ export default function ReviewPanel({
   onAddTerm,
   manualAreas,
   onRemoveArea,
+  onHighlight,
+  onReveal,
 }: Props) {
   return (
     <aside className="review" aria-label="Review what gets masked">
       <h2>Masked in the export</h2>
       <CustomTermForm onAddTerm={onAddTerm} />
-      <p className="review__hint">Drag on a page to mask an area by hand.</p>
       {groups.length === 0 && <p className="review__empty">Nothing detected yet.</p>}
-      {groups.map((group) => (
-        <ReviewGroupList key={group.type} group={group} unmasked={unmasked} onChange={onChange} />
-      ))}
-      {manualAreas.length > 0 && (
-        <ManualAreaList manualAreas={manualAreas} onRemoveArea={onRemoveArea} />
-      )}
+      {groups.map((group) => {
+        const keys = group.rows.map((row) => row.key)
+        return (
+          <Group
+            key={group.type}
+            label={group.label}
+            count={`${keys.filter((key) => !unmasked.has(key)).length}/${keys.length}`}
+            selection={{ keys, unmasked, onChange }}
+          >
+            {group.rows.map((row) => (
+              <Row
+                key={row.key}
+                rowKey={row.key}
+                label={row.value}
+                onHighlight={onHighlight}
+                onReveal={onReveal}
+                control={
+                  <input
+                    type="checkbox"
+                    checked={!unmasked.has(row.key)}
+                    onChange={(event) => onChange([row.key], event.target.checked)}
+                    aria-label={`Mask ${row.value}`}
+                  />
+                }
+                end={
+                  <span className="review__count" title={`${row.count} occurrences in the deck`}>
+                    ×{row.count}
+                  </span>
+                }
+              />
+            ))}
+          </Group>
+        )
+      })}
+      <Group label="Manual areas" count={String(manualAreas.length)}>
+        {manualAreas.length === 0 && (
+          <li className="review__empty">
+            Drag on a page to mask anything the detector missed: logos, photos, screenshots.
+          </li>
+        )}
+        {[...manualAreas]
+          .sort((a, b) => a.page - b.page || a.id - b.id)
+          .map((area) => (
+            <Row
+              key={area.id}
+              rowKey={manualAreaKey(area.id)}
+              label={`Page ${area.page + 1}`}
+              onHighlight={onHighlight}
+              onReveal={onReveal}
+              end={
+                <button
+                  type="button"
+                  className="review__remove"
+                  onClick={() => onRemoveArea(area.id)}
+                  aria-label={`Remove the area on page ${area.page + 1}`}
+                >
+                  Remove
+                </button>
+              }
+            />
+          ))}
+      </Group>
     </aside>
   )
 }
@@ -72,78 +133,102 @@ function CustomTermForm({ onAddTerm }: Pick<Props, 'onAddTerm'>) {
   )
 }
 
-// Always masked; removing an area is how to unmask it.
-function ManualAreaList({ manualAreas, onRemoveArea }: Pick<Props, 'manualAreas' | 'onRemoveArea'>) {
+type Selection = {
+  keys: string[]
+  unmasked: ReadonlySet<string>
+  onChange: (keys: string[], masked: boolean) => void
+}
+
+// A collapsible group with its counter, and a checkbox for all its rows
+// when it has a selection.
+function Group({
+  label,
+  count,
+  selection,
+  children,
+}: {
+  label: string
+  count: string
+  selection?: Selection
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(true)
+  const listId = useId()
+
+  const maskedCount = selection ? selection.keys.filter((key) => !selection.unmasked.has(key)).length : 0
+  const all = selection !== undefined && maskedCount === selection.keys.length
+  const mixed = selection !== undefined && maskedCount > 0 && !all
+
+  // "Some checked" has no HTML attribute; it is set from script.
+  const groupBox = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (groupBox.current) groupBox.current.indeterminate = mixed
+  }, [mixed])
+
   return (
     <section className="review__group">
-      <div className="review__group-label">
-        Manual areas <span className="review__count">{manualAreas.length}</span>
+      <div className="review__group-head">
+        {selection && (
+          <input
+            ref={groupBox}
+            type="checkbox"
+            checked={all}
+            onChange={() => selection.onChange(selection.keys, !all)}
+            aria-label={`Mask every value in ${label}`}
+          />
+        )}
+        <button
+          type="button"
+          className="review__group-toggle"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => setOpen(!open)}
+        >
+          <span className="review__chevron" aria-hidden="true" />
+          {label}
+          <span className="review__count">{count}</span>
+        </button>
       </div>
-      <ul>
-        {[...manualAreas]
-          .sort((a, b) => a.page - b.page || a.id - b.id)
-          .map((area) => (
-            <li key={area.id} className="review__area">
-              <span className="review__value">Page {area.page + 1}</span>
-              <button
-                type="button"
-                className="review__remove"
-                onClick={() => onRemoveArea(area.id)}
-                aria-label={`Remove the area on page ${area.page + 1}`}
-              >
-                Remove
-              </button>
-            </li>
-          ))}
+      <ul id={listId} hidden={!open}>
+        {children}
       </ul>
     </section>
   )
 }
 
-function ReviewGroupList({
-  group,
-  unmasked,
-  onChange,
-}: { group: ReviewGroup } & Pick<Props, 'unmasked' | 'onChange'>) {
-  const keys = group.rows.map((row) => row.key)
-  const maskedCount = keys.filter((key) => !unmasked.has(key)).length
-  const all = maskedCount === keys.length
-  const none = maskedCount === 0
-
-  // "Some checked" has no HTML attribute; it is set from script.
-  const groupBox = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (groupBox.current) groupBox.current.indeterminate = !all && !none
-  }, [all, none])
-
+// One row: hovering or focusing it highlights its zones on the pages, and
+// its label scrolls to the first one. The checkbox keeps its own role.
+function Row({
+  rowKey,
+  label,
+  control,
+  end,
+  onHighlight,
+  onReveal,
+}: {
+  rowKey: string
+  label: string
+  control?: ReactNode
+  end: ReactNode
+} & Pick<Props, 'onHighlight' | 'onReveal'>) {
   return (
-    <section className="review__group">
-      <label className="review__group-label">
-        <input
-          ref={groupBox}
-          type="checkbox"
-          checked={all}
-          onChange={() => onChange(keys, !all)}
-        />
-        {group.label} <span className="review__count">{maskedCount}/{keys.length}</span>
-      </label>
-      <ul>
-        {group.rows.map((row) => (
-          <li key={row.key}>
-            <label>
-              <input
-                type="checkbox"
-                checked={!unmasked.has(row.key)}
-                onChange={(event) => onChange([row.key], event.target.checked)}
-              />
-              <span className="review__value">{row.value}</span>
-              <span className="review__count" title={`${row.count} occurrences in the deck`}>
-                ×{row.count}
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <li
+      className="review__row"
+      onMouseEnter={() => onHighlight(rowKey)}
+      onMouseLeave={() => onHighlight(null)}
+      onFocus={() => onHighlight(rowKey)}
+      onBlur={() => onHighlight(null)}
+    >
+      {control}
+      <button
+        type="button"
+        className="review__row-label"
+        onClick={() => onReveal(rowKey)}
+        title="Show on the page"
+      >
+        {label}
+      </button>
+      {end}
+    </li>
   )
 }

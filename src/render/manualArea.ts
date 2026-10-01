@@ -8,6 +8,10 @@ export type ManualArea = {
   rect: Rect
 }
 
+// The review key of a manual area. A detected value's key never starts
+// with a colon, so the two cannot collide.
+export const manualAreaKey = (id: number) => `:manual:${id}`
+
 // Below this size in page units, a drag is taken for a click.
 export const MIN_AREA_SIZE = 3
 

@@ -14,7 +14,7 @@ import { downloadPdf, EXPORT_FILE_NAME, exportPdf } from '../export/exportPdf.ts
 import { fileSizeProblem, loadErrorMessage, textLayerNotice } from '../pdf/fileChecks.ts'
 import { loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import type { PageText, Rect } from '../pdf/textIndex.ts'
-import type { ManualArea } from '../render/manualArea.ts'
+import { manualAreaKey, type ManualArea } from '../render/manualArea.ts'
 import DebugPanel from './DebugPanel.tsx'
 import Home from './Home.tsx'
 import PageView from './PageView.tsx'
@@ -43,6 +43,8 @@ export default function App() {
   // "Exporting 3/9" while an export runs.
   const [exporting, setExporting] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  // The review row under the pointer or the keyboard focus.
+  const [highlighted, setHighlighted] = useState<string | null>(null)
   const [showOverlay, setShowOverlay] = useState(false)
   // Values the user unchecked. Everything else is masked (fail closed).
   const [unmasked, setUnmasked] = useState<ReadonlySet<string>>(new Set())
@@ -110,6 +112,34 @@ export default function App() {
       ]),
     [pages, isMasked, manualAreas],
   )
+
+  // Zones of the highlighted row, on every page; for a manual area, itself.
+  const isHighlighted = useCallback(
+    (key: string) => highlighted !== null && (key === highlighted || review.rowsOf(key).includes(highlighted)),
+    [highlighted, review],
+  )
+
+  // Scrolls the pages to a row's first occurrence.
+  function reveal(key: string) {
+    let target: { page: number; rect: Rect } | undefined
+    const area = manualAreas.find((candidate) => manualAreaKey(candidate.id) === key)
+    if (area) target = area
+    else {
+      for (const [page, analysis] of pages.entries()) {
+        const zone = analysis.zones.find((candidate) => review.rowsOf(candidate.key).includes(key))
+        if (zone) {
+          target = { page, rect: zone.rect }
+          break
+        }
+      }
+    }
+    const sheet = target && document.getElementById(`page-${target.page + 1}`)
+    if (!target || !sheet) return
+    const box = sheet.getBoundingClientRect()
+    const y = box.top + window.scrollY + (target.rect.y / pages[target.page].pageText.height) * box.height
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: y - window.innerHeight / 3, behavior: reduced ? 'auto' : 'smooth' })
+  }
 
   function drawArea(page: number, rect: Rect) {
     setManualAreas((areas) => [...areas, { id: nextAreaId.current++, page, rect }])
@@ -332,6 +362,7 @@ export default function App() {
               analysis={analysis}
               masks={masks[i]}
               isMasked={isMasked}
+              isHighlighted={isHighlighted}
               labelOf={(key) => review.rowsOf(key).map((row) => labels.get(row) ?? row).join(', ')}
               onToggle={toggle}
               manualAreas={manualAreas.filter((area) => area.page === i)}
@@ -347,6 +378,8 @@ export default function App() {
           onAddTerm={addTerm}
           manualAreas={manualAreas}
           onRemoveArea={removeArea}
+          onHighlight={setHighlighted}
+          onReveal={reveal}
         />
       </main>
       <footer className="work__debug">
