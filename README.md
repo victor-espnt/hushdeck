@@ -17,10 +17,11 @@ Hushdeck finds the sensitive items, lets you review them, and exports a new PDF 
 
 Use it before you paste a deck into an AI assistant or forward it to anyone.
 
-<!-- Victor: rewrite in your own words -->
 ## Why I built this
 
-I spent ten years building dealflow and portfolio management software used by more than 200 VC funds. I saw decks forwarded, forwarded again, and now pasted into AI assistants. Masking them properly took too long, so nobody did it.
+I built portfolio software used by hundreds of investors and funds. Decks were everywhere: forwarded to partners, shared with co-investors, and now pasted into AI assistants. In my experience, and from my research, there is a wide gap between the trust we place in AI models and what we know about keeping data confidential and secure.
+
+Hushdeck shows that one small step before sharing makes this safer, and that you can check it instead of taking it on faith. Staying informed is one of the most important things in AI right now.
 
 ## Why local
 
