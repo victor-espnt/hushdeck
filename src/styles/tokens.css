@@ -1,0 +1,41 @@
+/* Design tokens: the one place for colors, type, radius and shadow. */
+
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+
+:root {
+  /* Colors */
+  --paper: #f5f6f4; /* page background */
+  --surface: #ffffff;
+  --ink: #121413; /* text */
+  --muted: #5e6662;
+  --line: #daddd9;
+  --mask: #000000;
+  --mark: #f2d63b; /* hover, selection, focus */
+  --exposed: #c2362f; /* unmasked zones, warnings */
+  --local: #2f7d53; /* "local" status */
+
+  /* Type */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --text-s: 13px;
+  --text-m: 15px;
+  --text-l: 18px;
+  --text-xl: 28px;
+
+  /* Shapes */
+  --radius: 4px;
+  --border: 1px solid var(--line);
+  --shadow: 0 1px 3px rgb(18 20 19 / 0.08), 0 4px 12px rgb(18 20 19 / 0.06);
+
+  /* Motion */
+  --transition: 120ms ease-out;
+
+  color-scheme: light;
+  font: 400 var(--text-m) / 1.5 var(--font-sans);
+  color: var(--ink);
+  background: var(--paper);
+}
