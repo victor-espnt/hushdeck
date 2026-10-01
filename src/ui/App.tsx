@@ -10,22 +10,24 @@ import {
 import type { NerEntity } from '../detect/ner.ts'
 import type { NerHandlers } from '../detect/nerClient.ts'
 import { buildReview } from '../detect/review.ts'
-import { downloadPdf, exportPdf } from '../export/exportPdf.ts'
+import { downloadPdf, EXPORT_FILE_NAME, exportPdf } from '../export/exportPdf.ts'
 import { fileSizeProblem, loadErrorMessage, textLayerNotice } from '../pdf/fileChecks.ts'
 import { loadPdf, type PDFDocumentProxy } from '../pdf/loadPdf.ts'
 import type { PageText, Rect } from '../pdf/textIndex.ts'
 import type { ManualArea } from '../render/manualArea.ts'
 import DebugPanel from './DebugPanel.tsx'
 import Home from './Home.tsx'
-import Logo from './Logo.tsx'
-import NerProgress, { type NerState } from './NerProgress.tsx'
-import OverlayLegend from './OverlayLegend.tsx'
 import PageView from './PageView.tsx'
 import ReviewPanel from './ReviewPanel.tsx'
+import { exportBlocker, statusPill, type NerState } from './status.ts'
+import TopBar from './TopBar.tsx'
 
 type Deck = {
   doc: PDFDocumentProxy
-  pageTexts: PageText[]
+  // Shown in the top bar only, never in the export.
+  fileName: string
+  // Null while the text is read: no page shows before its masks are known.
+  pageTexts: PageText[] | null
   // Pages without a text layer, where nothing can be detected.
   textNotice: string | null
 }
@@ -35,8 +37,12 @@ export default function App() {
   // NER entities per page, filled in as the model finishes each page.
   const [entities, setEntities] = useState<NerEntity[][]>([])
   const [ner, setNer] = useState<NerState>({ phase: 'idle' })
+  // Opening a file (home screen).
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // "Exporting 3/9" while an export runs.
+  const [exporting, setExporting] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const [showOverlay, setShowOverlay] = useState(false)
   // Values the user unchecked. Everything else is masked (fail closed).
   const [unmasked, setUnmasked] = useState<ReadonlySet<string>>(new Set())
@@ -63,21 +69,30 @@ export default function App() {
   }, [])
 
   // Release the previous document when it is replaced or the app unmounts.
+  const doc = deck?.doc
   useEffect(() => {
     return () => {
-      deck?.doc.loadingTask.destroy()
+      doc?.loadingTask.destroy()
     }
-  }, [deck])
+  }, [doc])
+
+  // The export toast fades after a few seconds.
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   // Rules apply at once; NER detections join as they arrive. A NER value
   // is masked on every page, so every page is analyzed again.
   const pages = useMemo(() => {
-    if (!deck) return []
-    const texts = deck.pageTexts.map((page) => page.text)
-    const joined = deck.pageTexts.map((page, i) => joinLineBreaks(page, entities[i] ?? []))
+    const pageTexts = deck?.pageTexts
+    if (!pageTexts) return []
+    const texts = pageTexts.map((page) => page.text)
+    const joined = pageTexts.map((page, i) => joinLineBreaks(page, entities[i] ?? []))
     const found = nerDetections(texts, joined)
     const custom = termDetections(texts, customTerms)
-    return deck.pageTexts.map((page, i) => analyzePage(page, [...found[i], ...custom[i]]))
+    return pageTexts.map((page, i) => analyzePage(page, [...found[i], ...custom[i]]))
   }, [deck, entities, customTerms])
 
   const review = useMemo(() => buildReview(pages), [pages])
@@ -122,7 +137,7 @@ export default function App() {
   // Returns a message when the term cannot be added.
   function addTerm(input: string): string | null {
     const term = input.replace(/\s+/g, ' ').trim()
-    if (!deck || term === '') return null
+    if (!deck?.pageTexts || term === '') return null
     if (!deck.pageTexts.some((page) => findOccurrences(page.text, term).length > 0)) {
       return `"${term}" does not appear in the text of this deck.`
     }
@@ -139,7 +154,7 @@ export default function App() {
     setMasked(review.rowsOf(key), !isMasked(key))
   }
 
-  const nerRunning = ner.phase === 'download' || ner.phase === 'analyze'
+  const reading = deck !== null && deck.pageTexts === null
 
   function runNer(pageTexts: PageText[]) {
     const current = ++run.current
@@ -176,6 +191,7 @@ export default function App() {
   async function handleExport() {
     if (!deck) return
     setError(null)
+    setExporting(`Exporting 1/${pages.length}`)
     try {
       const exportPages = pages.map((page, i) => ({
         width: page.pageText.width,
@@ -183,13 +199,14 @@ export default function App() {
         masks: masks[i],
       }))
       const bytes = await exportPdf(deck.doc, exportPages, (pageNumber) =>
-        setStatus(`Exporting page ${pageNumber} of ${pages.length}…`),
+        setExporting(`Exporting ${pageNumber}/${pages.length}`),
       )
       downloadPdf(bytes)
+      setToast(`${EXPORT_FILE_NAME} saved. Nothing left your device.`)
     } catch {
       setError('The export failed.')
     } finally {
-      setStatus(null)
+      setExporting(null)
     }
   }
 
@@ -231,19 +248,21 @@ export default function App() {
       setStatus(null)
       return
     }
-    // Pages are shown only once their text is read, so rule masks are
-    // there from the first paint.
-    setStatus('Reading the text…')
+    // The working screen opens at once; pages show only once their text
+    // is read, so rule masks are there from the first paint.
+    setStatus(null)
+    const current = run.current
+    setDeck({ doc, fileName: file.name, pageTexts: null, textNotice: null })
     try {
       const pageTexts = await extractDocumentText(doc)
-      setDeck({ doc, pageTexts, textNotice: textLayerNotice(pageTexts) })
+      if (run.current !== current) return
+      setDeck({ doc, fileName: file.name, pageTexts, textNotice: textLayerNotice(pageTexts) })
       // Without any text, there is nothing for the model to read.
       if (pageTexts.some((page) => page.text.trim() !== '')) runNer(pageTexts)
     } catch {
-      doc.loadingTask.destroy()
+      if (run.current !== current) return
+      setDeck(null)
       setError('The text of this PDF could not be read.')
-    } finally {
-      setStatus(null)
     }
   }
 
@@ -273,51 +292,43 @@ export default function App() {
           error={error}
         />
         <div className="home__debug">
-          <DebugPanel />
+          <DebugPanel showOverlay={showOverlay} onShowOverlay={setShowOverlay} />
         </div>
         {picker}
       </>
     )
   }
 
+  const nerFailure =
+    ner.phase === 'error'
+      ? `Names and organizations could not be checked (${ner.message}). Only emails, phone numbers, amounts and percentages are masked.`
+      : null
+
   return (
-    <main className="app">
-      <header className="topbar">
-        <Logo size="small" />
-        <button type="button" onClick={openPicker} disabled={status !== null}>
-          Open another deck
-        </button>
-      </header>
+    <div className="work">
+      <TopBar
+        fileName={deck.fileName}
+        status={statusPill({ reading, exporting, ner })}
+        onOpen={openPicker}
+        onExport={handleExport}
+        exportBlocker={exportBlocker({ reading, exporting, ner })}
+        busy={exporting !== null}
+      />
       {picker}
-      {status && <p role="status">{status}</p>}
-      {error && <p role="alert" className="error">{error}</p>}
-      <div className="workspace">
-        <section className="pages">
-          {deck.textNotice && (
-            <p role="alert" className="notice">
-              {deck.textNotice}
+      <main className="workspace">
+        <section className="pages" aria-label="Pages">
+          {[error, nerFailure, deck.textNotice].filter(Boolean).map((message) => (
+            <p key={message} role="alert" className="notice">
+              {message}
             </p>
-          )}
-          <NerProgress state={ner} />
-          <div className="toolbar">
-            <button type="button" onClick={handleExport} disabled={status !== null || nerRunning}>
-              Export anonymized PDF
-            </button>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={showOverlay}
-                onChange={(event) => setShowOverlay(event.target.checked)}
-              />
-              Show debug overlay
-            </label>
-          </div>
-          {showOverlay && <OverlayLegend />}
+          ))}
+          {reading && <p className="pages__placeholder">Reading pages…</p>}
           {pages.map((analysis, i) => (
             <PageView
               key={i + 1}
               doc={deck.doc}
               pageNumber={i + 1}
+              pageCount={pages.length}
               analysis={analysis}
               masks={masks[i]}
               isMasked={isMasked}
@@ -337,8 +348,15 @@ export default function App() {
           manualAreas={manualAreas}
           onRemoveArea={removeArea}
         />
-      </div>
-      <DebugPanel />
-    </main>
+      </main>
+      <footer className="work__debug">
+        <DebugPanel showOverlay={showOverlay} onShowOverlay={setShowOverlay} />
+      </footer>
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
+    </div>
   )
 }

@@ -1,7 +1,14 @@
 import { useState } from 'react'
+import OverlayLegend from './OverlayLegend.tsx'
 
-// Debug tools. The NER smoke test runs on the fictional sample deck only.
-export default function DebugPanel() {
+type Props = {
+  showOverlay: boolean
+  onShowOverlay: (show: boolean) => void
+}
+
+// Debug tools: the text block overlay, and the NER smoke test, which runs
+// on the fictional sample deck only.
+export default function DebugPanel({ showOverlay, onShowOverlay }: Props) {
   const [running, setRunning] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
 
@@ -27,6 +34,15 @@ export default function DebugPanel() {
   return (
     <details className="debug">
       <summary>Debug</summary>
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={showOverlay}
+          onChange={(event) => onShowOverlay(event.target.checked)}
+        />
+        Show text blocks and detections over the pages
+      </label>
+      {showOverlay && <OverlayLegend />}
       <button type="button" onClick={handleNerSmokeTest} disabled={running}>
         Run NER smoke test
       </button>

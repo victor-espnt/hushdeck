@@ -9,6 +9,7 @@ import { renderPage } from '../render/renderPage.ts'
 type Props = {
   doc: PDFDocumentProxy
   pageNumber: number
+  pageCount: number
   analysis: PageAnalysis
   // The areas burned in black, as in the export.
   masks: Rect[]
@@ -26,6 +27,7 @@ type Props = {
 export default function PageView({
   doc,
   pageNumber,
+  pageCount,
   analysis,
   masks,
   isMasked,
@@ -89,8 +91,8 @@ export default function PageView({
         <ZoneLayer analysis={analysis} isMasked={isMasked} labelOf={labelOf} onToggle={onToggle} />
         {showOverlay && <DebugOverlay analysis={analysis} />}
       </div>
-      <figcaption>
-        {failed ? `Page ${pageNumber} could not be rendered.` : `Page ${pageNumber}`}
+      <figcaption className="page__number">
+        {failed ? `Page ${pageNumber} could not be rendered.` : `${pageNumber} / ${pageCount}`}
       </figcaption>
     </figure>
   )
@@ -113,6 +115,17 @@ function DrawLayer({
       y: ((event.clientY - box.top) / box.height) * height,
     }
   }
+
+  // Escape cancels a drag in progress.
+  const dragging = drag !== null
+  useEffect(() => {
+    if (!dragging) return
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDrag(null)
+    }
+    window.addEventListener('keydown', cancel)
+    return () => window.removeEventListener('keydown', cancel)
+  }, [dragging])
 
   const preview = drag && rectFromCorners(drag.x0, drag.y0, drag.x1, drag.y1, width, height)
 
