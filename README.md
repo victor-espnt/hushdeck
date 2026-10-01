@@ -2,8 +2,7 @@
 
 Anonymize a pitch deck in your browser. Nothing leaves your device.
 
-<!-- TODO: record demo GIF -->
-![Demo](docs/demo.gif)
+![Demo: load the sample deck, mask the logo by hand, unmask a false positive, export](docs/demo.gif)
 
 **Try it:** https://victor-espnt.github.io/hushdeck/
 
