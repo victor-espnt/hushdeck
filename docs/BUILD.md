@@ -64,11 +64,13 @@ Every hypothesis tested here is technical. None is about demand. I have not yet 
 
 | Time (CEST) | Milestone |
 |---|---|
-| 19:14 | Brief |
+| 19:14 | Brief and plan |
 | 19:56 | Repository created |
-| 20:34 | Empty app live on GitHub Pages |
-| 20:44 | Text positions verified on the sample deck |
-| 21:03 | Milestone 1: rule-based pipeline, export verified |
-| 21:11 | NER model tested alone |
-| 21:40 | NER, review panel and CSP live |
-| 22:00 | Feature-complete |
+| 20:33 | Empty app live on GitHub Pages |
+| 20:41 | Debug overlay live, text positions checked by hand |
+| 20:58 | Rasterized export live, checked with pdftotext and pdfinfo |
+| 21:09 | NER model tested alone |
+| 21:36 | NER, review panel and page CSP live |
+| 21:56 | CSP extended to workers, manual areas, sample deck button, error states: feature-complete |
+
+Times are commit and deploy times from git and GitHub, except the brief.
