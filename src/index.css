@@ -639,3 +639,61 @@ a {
   stroke: var(--mark);
   stroke-width: 3;
 }
+
+/* Finishes */
+
+button,
+a,
+input {
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    opacity var(--transition);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: #2a2e2c;
+}
+
+.link-button:hover:not(:disabled),
+a:hover {
+  color: var(--ink);
+}
+
+/* Yellow focus ring with a thin ink edge, so it shows on any background
+   (yellow alone is 1.45:1 against white). */
+:focus-visible {
+  outline: 3px solid var(--mark);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 5px var(--ink);
+}
+
+input[type='text']:focus-visible {
+  outline-offset: 0;
+}
+
+.toast {
+  animation: toast-in var(--transition);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
